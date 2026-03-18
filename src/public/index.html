@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 照片纪念系统</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+    }
+
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 2em;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #666;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .status {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    .status-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .status-item:last-child {
+      border-bottom: none;
+    }
+
+    .status-label {
+      color: #666;
+    }
+
+    .status-value {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .status-value.success {
+      color: #28a745;
+    }
+
+    .status-value.pending {
+      color: #ffc107;
+    }
+
+    .actions {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 30px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 14px 28px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-decoration: none;
+      border-radius: 10px;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .image-container {
+      margin-top: 30px;
+      text-align: center;
+    }
+
+    .image-container img {
+      max-width: 100%;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .caption {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 12px;
+      font-size: 16px;
+      line-height: 1.8;
+      color: #333;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>AI 照片纪念系统</h1>
+      <p class="subtitle">用 AI 发现生活中的美好瞬间</p>
+
+      <div class="status">
+        <div class="status-item">
+          <span class="status-label">日期</span>
+          <span class="status-value" id="date">加载中...</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">状态</span>
+          <span class="status-value" id="status">加载中...</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" onclick="loadToday()" id="refreshBtn">刷新</button>
+        <button class="btn" onclick="regenerate()" id="regenerateBtn">重新生成</button>
+      </div>
+
+      <div id="content">
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>加载中...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+    }
+
+    async function loadToday() {
+      const content = document.getElementById('content');
+      const status = document.getElementById('status');
+      const date = document.getElementById('date');
+      const refreshBtn = document.getElementById('refreshBtn');
+      const regenerateBtn = document.getElementById('regenerateBtn');
+
+      refreshBtn.disabled = true;
+      regenerateBtn.disabled = true;
+
+      content.innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>加载中...</p>
+        </div>
+      `;
+
+      try {
+        const response = await fetch('/api/memories/today');
+        const data = await response.json();
+
+        const today = new Date().toISOString().split('T')[0];
+        date.textContent = formatDate(today);
+
+        if (data.success && data.image) {
+          status.textContent = '已生成纪念图片';
+          status.className = 'status-value success';
+
+          content.innerHTML = `
+            <div class="image-container">
+              <img src="${data.image}" alt="今日纪念" />
+            </div>
+          `;
+        } else {
+          status.textContent = '等待生成';
+          status.className = 'status-value pending';
+          content.innerHTML = `
+            <div class="loading">
+              <p>今日纪念图片尚未生成</p>
+              <p>点击"重新生成"开始创建</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        status.textContent = '加载失败';
+        status.className = 'status-value';
+        content.innerHTML = `
+          <div class="loading">
+            <p>加载失败，请稍后重试</p>
+          </div>
+        `;
+      } finally {
+        refreshBtn.disabled = false;
+        regenerateBtn.disabled = false;
+      }
+    }
+
+    async function regenerate() {
+      const content = document.getElementById('content');
+      const regenerateBtn = document.getElementById('regenerateBtn');
+
+      regenerateBtn.disabled = true;
+      content.innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>AI 正在处理中...</p>
+          <p style="font-size: 14px; margin-top: 10px;">这可能需要几分钟时间</p>
+        </div>
+      `;
+
+      try {
+        const response = await fetch('/api/memories/regenerate', {
+          method: 'POST'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          await loadToday();
+        } else {
+          content.innerHTML = `
+            <div class="loading">
+              <p>${data.message || '生成失败'}</p>
+              <button class="btn" onclick="loadToday()" style="margin-top: 20px;">返回</button>
+            </div>
+          `;
+        }
+      } catch (error) {
+        content.innerHTML = `
+          <div class="loading">
+            <p>生成失败，请稍后重试</p>
+            <button class="btn" onclick="loadToday()" style="margin-top: 20px;">返回</button>
+          </div>
+        `;
+      } finally {
+        regenerateBtn.disabled = false;
+      }
+    }
+
+    // 页面加载时自动获取今日纪念
+    loadToday();
+  </script>
+</body>
+</html>

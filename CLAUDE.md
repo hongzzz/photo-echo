@@ -6,27 +6,50 @@
 
 ## 技术栈
 
-- **运行时**: Node.js + TypeScript
+- **框架**: NestJS (Node.js + TypeScript)
+- **数据库**: SQLite + TypeORM
 - **照片管理**: Immich (自托管)
 - **AI 推理**: Ollama (本地多模态模型)
 - **图像处理**: Sharp
-- **定时任务**: macOS launchd
+- **定时任务**: @nestjs/schedule (每天 4 点执行)
 
 ## 项目结构
 
 ```
 ai-photo-selector/
 ├── src/
-│   ├── config.ts              # 配置管理（环境变量）
-│   ├── services/
-│   │   ├── immich.ts           # Immich API 客户端
-│   │   ├── ollama.ts           # Ollama 推理引擎
-│   │   └── imageProcessor.ts  # 图像处理模块
-│   └── index.ts                # 主调度器
+│   ├── main.ts                      # 应用入口
+│   ├── app.module.ts                # 根模块
+│   ├── config/
+│   │   └── configuration.ts         # 配置加载
+│   ├── modules/
+│   │   ├── memories/                # 纪念照片模块（核心）
+│   │   │   ├── dto/
+│   │   │   ├── entities/
+│   │   │   │   └── memorial.entity.ts
+│   │   │   ├── memories.controller.ts
+│   │   │   ├── memories.service.ts
+│   │   │   └── memories.scheduler.ts  # 定时任务
+│   │   ├── immich/                  # Immich 服务
+│   │   │   ├── immich.service.ts
+│   │   │   └── immich.module.ts
+│   │   ├── ollama/                  # Ollama 服务
+│   │   │   ├── ollama.service.ts
+│   │   │   └── ollama.module.ts
+│   │   ├── image-processor/         # 图像处理
+│   │   │   ├── image-processor.service.ts
+│   │   │   └── image-processor.module.ts
+│   │   └── health/                  # 健康检查
+│   │       ├── health.controller.ts
+│   │       └── health.module.ts
+│   └── public/                      # 前端静态资源
+│       └── index.html
+├── data/                            # SQLite 数据库
+├── output/                          # 纪念卡片输出
 ├── package.json
 ├── tsconfig.json
-├── .env.example
-└── com.user.photo-memories.plist  # launchd 配置
+├── nest-cli.json
+└── .env.example
 ```
 
 ## 核心功能
@@ -35,6 +58,7 @@ ai-photo-selector/
 2. **AI 筛选**: Moondream 粗筛 → Qwen3-VL 精选
 3. **文案生成**: 基于图像内容生成艺术风格中文文案
 4. **图片合成**: Sharp 处理，文字叠加生成纪念卡片
+5. **定时任务**: 每天凌晨 4 点自动执行
 
 ## 配置说明
 
@@ -50,9 +74,15 @@ OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL_PRIMARY=qwen3-vl:7b
 OLLAMA_MODEL_SCREEN=moondream:1.8b
 
-# 输出
+# 系统
 OUTPUT_DIR=./output
 STYLE_PREFERENCE=classical  # classical | modern | nostalgic
+PORT=3000
+
+# 可选
+# DAYS_LOOKBACK=365
+# MAX_ASSETS=50
+# DATABASE_PATH=./data/memorials.db
 ```
 
 ## 开发命令
@@ -61,15 +91,24 @@ STYLE_PREFERENCE=classical  # classical | modern | nostalgic
 # 安装依赖
 npm install
 
-# 编译 TypeScript
+# 编译
 npm run build
 
 # 运行
 npm run start
 
 # 开发模式（监听）
-npm run dev
+npm run start:dev
 ```
+
+## API 接口
+
+| 方法 | 路径 | 描述 |
+|------|------|------|
+| GET | `/health` | 健康检查 |
+| GET | `/api/memories/today` | 获取今日纪念 |
+| POST | `/api/memories/regenerate` | 重新生成 |
+| GET | `/api/memories/history` | 历史记录 |
 
 ## Ollama 模型准备
 
@@ -83,24 +122,14 @@ ollama pull moondream
 ollama pull qwen3-vl:7b
 ```
 
-## 定时任务配置
-
-```bash
-# 加载 launchd 配置
-launchctl load com.user.photo-memories.plist
-
-# 卸载
-launchctl unload com.user.photo-memories.plist
-```
-
 ## 设计原则
 
 - **隐私优先**: 所有处理在本地完成，不上传照片到第三方
-- **模块化**: 各服务独立，便于测试和替换
+- **模块化**: NestJS 模块化架构，依赖注入
 - **可配置**: 支持多种文案风格和输出格式
 
 ## 注意事项
 
 - M1 Pro 统一内存有限，建议使用 4-bit 量化模型
 - Ollama 模型首次加载需 5-8 秒，后续推理约 30 秒/张
-- 建议每日定时运行，避免频繁唤醒模型
+- 定时任务每天 4 点执行，可通过修改 `memories.scheduler.ts` 调整

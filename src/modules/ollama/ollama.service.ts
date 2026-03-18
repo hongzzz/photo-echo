@@ -1,44 +1,36 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as http from 'http';
 import * as fs from 'fs';
-import * as path from 'path';
-import { config } from '../config';
 
-// 类型定义
 export interface MemoryScore {
-  overall: number;          // 综合评分 0-10
-  sentiment: number;        // 情感价值 0-10
-  composition: number;      // 构图美感 0-10
-  historical: number;       // 历史意义 0-10
-  nostalgia: number;        // 怀旧感 0-10
-  reason: string;           // 评分理由
+  overall: number;
+  sentiment: number;
+  composition: number;
+  historical: number;
+  nostalgia: number;
+  reason: string;
 }
 
 export interface CaptionResult {
-  caption: string;          // 生成的文案
-  style: string;            // 风格
+  caption: string;
+  style: string;
 }
 
-// Ollama 客户端类
-export class OllamaClient {
+@Injectable()
+export class OllamaService {
+  private readonly logger = new Logger(OllamaService.name);
   private host: string;
   private modelPrimary: string;
   private modelScreen: string;
 
-  constructor() {
-    this.host = config.ollama.host;
-    this.modelPrimary = config.ollama.modelPrimary;
-    this.modelScreen = config.ollama.modelScreen;
+  constructor(private configService: ConfigService) {
+    this.host = this.configService.get<string>('app.ollama.host') || 'http://localhost:11434';
+    this.modelPrimary = this.configService.get<string>('app.ollama.modelPrimary') || 'qwen3-vl:7b';
+    this.modelScreen = this.configService.get<string>('app.ollama.modelScreen') || 'moondream:1.8b';
   }
 
-  /**
-   * 发送请求到 Ollama API
-   */
-  private async request<T>(model: string, payload: {
-    prompt?: string;
-    messages?: Array<{ role: string; content: string; images?: string[] }>;
-    images?: string[];
-    stream?: boolean;
-  }): Promise<T> {
+  private async request<T>(model: string, payload: any): Promise<T> {
     const url = new URL('/api/generate', this.host);
 
     const body = JSON.stringify({
@@ -80,51 +72,19 @@ export class OllamaClient {
     });
   }
 
-  /**
-   * 将图片转换为 base64
-   */
   private imageToBase64(imagePath: string): string {
     const imageBuffer = fs.readFileSync(imagePath);
     return imageBuffer.toString('base64');
   }
 
-  /**
-   * 图像分析（通用）
-   */
-  async analyzeImage(imagePath: string, prompt: string): Promise<string> {
-    const base64Image = this.imageToBase64(imagePath);
+  async quickScreen(imagePath: string): Promise<boolean> {
+    if (!this.modelScreen || this.modelScreen.trim() === '') {
+      return true;
+    }
 
-    const response = await this.request<{ response: string }>(this.modelPrimary, {
-      prompt,
-      images: [base64Image],
-    });
+    const prompt = `请简要回答：这张照片是否有纪念价值？（是否有值得保留的记忆瞬间）
 
-    return response.response || '';
-  }
-
-  /**
-   * 纪念价值评分（使用快速筛选模型）
-   */
-  async scoreMemoryValue(imagePath: string): Promise<MemoryScore> {
-    const prompt = `你是一个专业的照片策展人。请分析这张照片的纪念价值，并给出评分。
-
-请从以下维度评分（0-10分）：
-1. 情感价值 - 照片中的人物情感、亲密时刻
-2. 构图美感 - 画面构图、光影、色彩
-3. 历史意义 - 值得纪念的时刻、重要场景
-4. 怀旧感 - 能唤起美好回忆的程度
-
-最后给出综合评分和简短理由。
-
-请以 JSON 格式返回：
-{
-  "sentiment": <情感价值评分>,
-  "composition": <构图美感评分>,
-  "historical": <历史意义评分>,
-  "nostalgia": <怀旧感评分>,
-  "overall": <综合评分>,
-  "reason": "<评分理由，30字以内>"
-}`;
+请只回答 "是" 或 "否"，不需要其他解释。`;
 
     try {
       const base64Image = this.imageToBase64(imagePath);
@@ -134,47 +94,14 @@ export class OllamaClient {
         images: [base64Image],
       });
 
-      // 解析 JSON 响应
-      const resultText = response.response || '';
-      const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-          sentiment: parsed.sentiment || 0,
-          composition: parsed.composition || 0,
-          historical: parsed.historical || 0,
-          nostalgia: parsed.nostalgia || 0,
-          overall: parsed.overall || 0,
-          reason: parsed.reason || '',
-        };
-      }
-
-      // 解析失败，返回默认评分
-      return {
-        sentiment: 5,
-        composition: 5,
-        historical: 5,
-        nostalgia: 5,
-        overall: 5,
-        reason: '评分解析失败',
-      };
+      const result = (response.response || '').trim().toLowerCase();
+      return result.includes('是') || result.includes('yes') || result.includes('true');
     } catch (error) {
-      console.error('Score memory value failed:', error);
-      return {
-        sentiment: 0,
-        composition: 0,
-        historical: 0,
-        nostalgia: 0,
-        overall: 0,
-        reason: '评分失败',
-      };
+      this.logger.error('快速筛选失败', error);
+      return true;
     }
   }
 
-  /**
-   * 使用精选模型进行深度评分
-   */
   async deepScoreMemoryValue(imagePath: string): Promise<MemoryScore> {
     const prompt = `你是一个专业的照片策展人。请深入分析这张照片的纪念价值，并给出专业评分。
 
@@ -205,7 +132,6 @@ export class OllamaClient {
         images: [base64Image],
       });
 
-      // 解析 JSON 响应
       const resultText = response.response || '';
       const jsonMatch = resultText.match(/\{[\s\S]*\}/);
 
@@ -230,7 +156,7 @@ export class OllamaClient {
         reason: '评分解析失败',
       };
     } catch (error) {
-      console.error('Deep score memory value failed:', error);
+      this.logger.error('深度评分失败', error);
       return {
         sentiment: 0,
         composition: 0,
@@ -242,10 +168,7 @@ export class OllamaClient {
     }
   }
 
-  /**
-   * 生成艺术风格文案
-   */
-  async generateCaption(imagePath: string, style: 'classical' | 'modern' | 'nostalgic' = 'classical'): Promise<CaptionResult> {
+  async generateCaption(imagePath: string, style: string = 'classical'): Promise<CaptionResult> {
     const stylePrompts = {
       classical: `请为这张照片生成一句古典诗意风格的纪念文案，要求：
 - 古风古韵，含蓄典雅
@@ -268,7 +191,7 @@ export class OllamaClient {
       const base64Image = this.imageToBase64(imagePath);
 
       const response = await this.request<{ response: string }>(this.modelPrimary, {
-        prompt: stylePrompts[style],
+        prompt: stylePrompts[style as keyof typeof stylePrompts] || stylePrompts.classical,
         images: [base64Image],
       });
 
@@ -279,45 +202,11 @@ export class OllamaClient {
         style,
       };
     } catch (error) {
-      console.error('Generate caption failed:', error);
+      this.logger.error('生成文案失败', error);
       return {
         caption: '时光静好，岁月如歌',
         style,
       };
     }
   }
-
-  /**
-   * 快速筛选图片（使用 Moondream）
-   * 如果没有配置粗筛模型，则跳过筛选直接返回 true
-   */
-  async quickScreen(imagePath: string): Promise<boolean> {
-    // 如果没有配置粗筛模型，跳过筛选
-    if (!this.modelScreen || this.modelScreen.trim() === '') {
-      return true;
-    }
-
-    const prompt = `请简要回答：这张照片是否有纪念价值？（是否有值得保留的记忆瞬间）
-
-请只回答 "是" 或 "否"，不需要其他解释。`;
-
-    try {
-      const base64Image = this.imageToBase64(imagePath);
-
-      const response = await this.request<{ response: string }>(this.modelScreen, {
-        prompt,
-        images: [base64Image],
-      });
-
-      const result = (response.response || '').trim().toLowerCase();
-      return result.includes('是') || result.includes('yes') || result.includes('true');
-    } catch (error) {
-      console.error('Quick screen failed:', error);
-      // 出错时默认通过
-      return true;
-    }
-  }
 }
-
-// 导出单例
-export const ollamaClient = new OllamaClient();

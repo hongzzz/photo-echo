@@ -12,6 +12,12 @@ node_modules/
 *.log
 logs/
 
+# 数据文件
+data/
+
+# Claude Code
+.claude/
+
 # 临时文件
 *.tmp
 *.temp
