@@ -9,7 +9,7 @@ PhotoEcho 是基于 Apple Silicon M1 Pro 的本地化媒体纪念系统，从 Im
 - **框架**: NestJS 10 (Node.js + TypeScript 5.7)
 - **数据库**: SQLite + TypeORM
 - **照片管理**: Immich (自托管, @immich/sdk)
-- **AI 推理**: Ollama (本地多模态模型, HTTP API)
+- **AI 推理**: Ollama (三模型架构: 粗筛/评分/文案, HTTP API)
 - **图像处理**: Sharp (SVG 文字叠加)
 - **定时任务**: @nestjs/schedule (每天凌晨 4 点执行)
 - **静态服务**: @nestjs/serve-static
@@ -63,9 +63,9 @@ photo-echo/
 
 1. **照片检索**: 从 Immich 获取同月同日历史照片 (跨多年)
 2. **缩略图下载**: 使用 Immich preview API (避免 HEIC/视频兼容问题)
-3. **AI 粗筛**: Moondream 快速判断是否有纪念价值
-4. **AI 精选**: Qwen3-VL 多维度评分 (情感/构图/历史/怀旧/综合, 0-10 分)
-5. **文案生成**: 基于最高分图像生成中文纪念文案 (3 种风格)
+3. **AI 粗筛**: qwen3-vl:4b 快速判断是否有纪念价值
+4. **AI 精选**: qwen3-vl:8b 多维度评分 (情感/构图/历史/怀旧, 0-10 分) + 画面描述
+5. **文案生成**: qwen3:8b 基于画面描述生成中文纪念文案 (3 种风格，纯文本模型)
 6. **图片合成**: Sharp SVG 叠加文字，生成纪念卡片
 7. **持久化**: 存入 SQLite，清理临时文件
 
@@ -88,8 +88,9 @@ IMMICH_API_KEY=your_api_key_here
 
 # Ollama
 OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL_PRIMARY=qwen3-vl:8b
-OLLAMA_MODEL_SCREEN=moondream:1.8b
+OLLAMA_MODEL_PRIMARY=qwen3-vl:8b    # 深度评分 + 画面描述（多模态）
+OLLAMA_MODEL_SCREEN=qwen3-vl:4b     # 粗筛（多模态轻量）
+OLLAMA_MODEL_TEXT=qwen3:8b           # 文案生成（纯文本）
 
 # 系统
 OUTPUT_DIR=./output
@@ -127,9 +128,21 @@ npm run start:prod  # 生产模式 (node dist/main)
 首次运行前需下载模型：
 
 ```bash
-ollama pull moondream        # 粗筛模型（快速，1.8b）
-ollama pull qwen3-vl:8b      # 主力模型（中文理解强）
+ollama pull qwen3-vl:4b      # 粗筛模型（多模态轻量，快速筛选）
+ollama pull qwen3-vl:8b      # 主力模型（多模态，深度评分 + 画面描述）
+ollama pull qwen3:8b          # 文案模型（纯文本，基于描述生成文案）
 ```
+
+### 三模型架构
+
+| 模型 | 配置项 | 用途 | 类型 |
+|------|--------|------|------|
+| qwen3-vl:4b | OLLAMA_MODEL_SCREEN | 粗筛：快速判断照片是否有纪念价值 | 多模态（轻量） |
+| qwen3-vl:8b | OLLAMA_MODEL_PRIMARY | 深度评分：四维评分 + 100-150 字画面描述 | 多模态（主力） |
+| qwen3:8b | OLLAMA_MODEL_TEXT | 文案生成：基于画面描述生成纪念文案 | 纯文本 |
+
+> 评分维度：情感价值 / 构图美感 / 历史意义 / 怀旧感，综合分为加权平均。
+> 文案生成采用"视觉→文本→文案"两阶段流水线，由多模态模型提取画面内容，再由纯文本模型生成文案。
 
 ## 数据库
 
@@ -157,7 +170,8 @@ SQLite 单表 `memorial`，TypeORM 自动同步 (synchronize: true)：
 ## 注意事项
 
 - M1 Pro 统一内存有限，建议使用 4-bit 量化模型
-- Ollama 模型首次加载需 5-8 秒，后续推理约 30 秒/张
+- Ollama 模型首次加载需 5-8 秒，后续推理约 30 秒/张；三个模型交替使用时会有模型切换开销
 - 定时任务默认每天凌晨 4 点执行，可通过 `CRON_SCHEDULE` 环境变量调整
 - Immich 使用 preview API 获取缩略图，自动处理 HEIC 和视频格式
 - Ollama 通信使用原生 HTTP (非 SDK)，`stream: false` 模式
+- qwen3 系列模型需要 `/no_think` 指令避免输出思考过程干扰 JSON 提取
