@@ -8,7 +8,9 @@
     "postbuild": "cp -r src/public dist/",
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "immich",
@@ -42,6 +44,7 @@
     "@nestjs/testing": "^10.4.15",
     "@types/node": "^22.10.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.0"
   }
 }

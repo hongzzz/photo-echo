@@ -12,192 +12,288 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: #0a0a0a;
+      min-height: 100vh;
+      color: #e8e0d8;
+    }
+
+    .page {
       min-height: 100vh;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
-      padding: 20px;
+      justify-content: center;
+      padding: 40px 20px;
     }
 
-    .container {
-      max-width: 800px;
+    .brand {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .brand h1 {
+      font-size: 20px;
+      font-weight: 300;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      color: rgba(232, 224, 216, 0.6);
+    }
+
+    .brand .divider {
+      width: 40px;
+      height: 1px;
+      background: rgba(232, 224, 216, 0.2);
+      margin: 16px auto;
+    }
+
+    .brand .subtitle {
+      font-size: 13px;
+      color: rgba(232, 224, 216, 0.35);
+      letter-spacing: 2px;
+    }
+
+    /* Main memorial display */
+    .memorial {
+      max-width: 640px;
       width: 100%;
+      position: relative;
     }
 
-    .card {
-      background: white;
-      border-radius: 20px;
-      padding: 40px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    .memorial-frame {
+      position: relative;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #1a1816;
+      box-shadow:
+        0 2px 8px rgba(0,0,0,0.4),
+        0 16px 48px rgba(0,0,0,0.3);
     }
 
-    h1 {
-      color: #333;
-      margin-bottom: 10px;
-      font-size: 2em;
-      text-align: center;
+    .memorial-frame img {
+      width: 100%;
+      display: block;
+      opacity: 0;
+      transition: opacity 0.6s ease;
     }
 
-    .subtitle {
-      color: #666;
-      text-align: center;
-      margin-bottom: 30px;
-      font-size: 14px;
+    .memorial-frame img.loaded {
+      opacity: 1;
     }
 
-    .status {
-      background: #f8f9fa;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 30px;
+    .memorial-info {
+      padding: 24px 28px;
+      background: #1a1816;
+      border-top: 1px solid rgba(232, 224, 216, 0.06);
     }
 
-    .status-item {
+    .memorial-caption {
+      font-size: 15px;
+      line-height: 1.9;
+      color: rgba(232, 224, 216, 0.75);
+      font-family: 'Songti SC', 'STSong', serif;
+      letter-spacing: 1px;
+      white-space: pre-wrap;
+    }
+
+    .memorial-meta {
+      margin-top: 16px;
       display: flex;
       justify-content: space-between;
-      padding: 10px 0;
-      border-bottom: 1px solid #eee;
+      align-items: center;
     }
 
-    .status-item:last-child {
-      border-bottom: none;
+    .memorial-date {
+      font-size: 12px;
+      color: rgba(232, 224, 216, 0.3);
+      letter-spacing: 2px;
     }
 
-    .status-label {
-      color: #666;
+    .memorial-score {
+      font-size: 11px;
+      color: rgba(232, 224, 216, 0.2);
+      letter-spacing: 1px;
     }
 
-    .status-value {
-      font-weight: 600;
-      color: #333;
-    }
-
-    .status-value.success {
-      color: #28a745;
-    }
-
-    .status-value.pending {
-      color: #ffc107;
-    }
-
-    .actions {
+    /* Status bar */
+    .status-bar {
+      max-width: 640px;
+      width: 100%;
+      margin-bottom: 32px;
       display: flex;
-      gap: 15px;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 4px;
+    }
+
+    .status-date {
+      font-size: 13px;
+      color: rgba(232, 224, 216, 0.4);
+      letter-spacing: 1px;
+    }
+
+    .status-badge {
+      font-size: 11px;
+      padding: 4px 12px;
+      border-radius: 100px;
+      letter-spacing: 1px;
+    }
+
+    .status-badge.success {
+      background: rgba(120, 180, 120, 0.15);
+      color: rgba(160, 210, 160, 0.8);
+    }
+
+    .status-badge.pending {
+      background: rgba(210, 180, 120, 0.12);
+      color: rgba(210, 190, 140, 0.7);
+    }
+
+    .status-badge.error {
+      background: rgba(200, 120, 120, 0.12);
+      color: rgba(210, 150, 150, 0.7);
+    }
+
+    /* Actions */
+    .actions {
+      max-width: 640px;
+      width: 100%;
+      display: flex;
+      gap: 12px;
       justify-content: center;
-      flex-wrap: wrap;
-      margin-bottom: 30px;
+      margin-top: 36px;
     }
 
     .btn {
-      display: inline-block;
-      padding: 14px 28px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 24px;
+      background: transparent;
+      color: rgba(232, 224, 216, 0.5);
       text-decoration: none;
-      border-radius: 10px;
-      font-weight: 600;
-      transition: transform 0.2s, box-shadow 0.2s;
-      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      letter-spacing: 1px;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(232, 224, 216, 0.1);
       cursor: pointer;
-      font-size: 16px;
+      font-family: inherit;
     }
 
     .btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+      color: rgba(232, 224, 216, 0.8);
+      border-color: rgba(232, 224, 216, 0.25);
+      background: rgba(232, 224, 216, 0.04);
     }
 
     .btn:active {
-      transform: translateY(0);
+      background: rgba(232, 224, 216, 0.08);
     }
 
     .btn:disabled {
-      opacity: 0.6;
+      opacity: 0.3;
       cursor: not-allowed;
     }
 
-    .image-container {
-      margin-top: 30px;
+    .btn.primary {
+      background: rgba(232, 224, 216, 0.08);
+      border-color: rgba(232, 224, 216, 0.15);
+      color: rgba(232, 224, 216, 0.7);
+    }
+
+    .btn.primary:hover {
+      background: rgba(232, 224, 216, 0.12);
+      border-color: rgba(232, 224, 216, 0.3);
+    }
+
+    /* Loading state */
+    .loading-state {
       text-align: center;
+      padding: 80px 20px;
     }
 
-    .image-container img {
-      max-width: 100%;
-      border-radius: 12px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    }
-
-    .loading {
-      text-align: center;
-      padding: 40px;
-      color: #666;
-    }
-
-    .spinner {
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #667eea;
+    .loader {
+      width: 24px;
+      height: 24px;
+      border: 1.5px solid rgba(232, 224, 216, 0.1);
+      border-top-color: rgba(232, 224, 216, 0.4);
       border-radius: 50%;
-      width: 40px;
-      height: 40px;
       animation: spin 1s linear infinite;
       margin: 0 auto 20px;
     }
 
     @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      to { transform: rotate(360deg); }
     }
 
-    .caption {
-      margin-top: 20px;
-      padding: 20px;
-      background: #f8f9fa;
-      border-radius: 12px;
-      font-size: 16px;
+    .loading-text {
+      font-size: 13px;
+      color: rgba(232, 224, 216, 0.3);
+      letter-spacing: 1px;
+    }
+
+    .loading-hint {
+      font-size: 12px;
+      color: rgba(232, 224, 216, 0.2);
+      margin-top: 8px;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+      color: rgba(232, 224, 216, 0.3);
       line-height: 1.8;
-      color: #333;
-      white-space: pre-wrap;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .page { padding: 24px 16px; }
+      .brand h1 { font-size: 16px; letter-spacing: 6px; }
+      .brand { margin-bottom: 32px; }
+      .memorial-info { padding: 20px; }
+      .memorial-caption { font-size: 14px; }
+      .actions { gap: 8px; }
+      .btn { padding: 10px 16px; font-size: 12px; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="card">
+  <div class="page">
+    <div class="brand">
       <h1>PhotoEcho</h1>
-      <p class="subtitle">历史照片的回响，AI 发现生活中的美好瞬间</p>
+      <div class="divider"></div>
+      <p class="subtitle">历史照片的回响</p>
+    </div>
 
-      <div class="status">
-        <div class="status-item">
-          <span class="status-label">日期</span>
-          <span class="status-value" id="date">加载中...</span>
-        </div>
-        <div class="status-item">
-          <span class="status-label">状态</span>
-          <span class="status-value" id="status">加载中...</span>
-        </div>
-      </div>
+    <div class="status-bar">
+      <span class="status-date" id="date"></span>
+      <span class="status-badge" id="status"></span>
+    </div>
 
-      <div class="actions">
-        <button class="btn" onclick="loadToday()" id="refreshBtn">刷新</button>
-        <button class="btn" onclick="regenerate()" id="regenerateBtn">重新生成</button>
-        <a class="btn" href="/history.html">历史回忆</a>
+    <div id="content" class="memorial">
+      <div class="loading-state">
+        <div class="loader"></div>
+        <p class="loading-text">加载中</p>
       </div>
+    </div>
 
-      <div id="content">
-        <div class="loading">
-          <div class="spinner"></div>
-          <p>加载中...</p>
-        </div>
-      </div>
+    <div class="actions">
+      <button class="btn" onclick="loadToday()" id="refreshBtn">刷新</button>
+      <button class="btn primary" onclick="regenerate()" id="regenerateBtn">重新生成</button>
+      <a class="btn" href="/history.html">历史回忆</a>
     </div>
   </div>
 
   <script>
     function formatDate(dateStr) {
-      const date = new Date(dateStr);
-      return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+      const d = new Date(dateStr);
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
     }
 
     async function loadToday() {
@@ -211,9 +307,9 @@
       regenerateBtn.disabled = true;
 
       content.innerHTML = `
-        <div class="loading">
-          <div class="spinner"></div>
-          <p>加载中...</p>
+        <div class="loading-state">
+          <div class="loader"></div>
+          <p class="loading-text">加载中</p>
         </div>
       `;
 
@@ -225,29 +321,28 @@
         date.textContent = formatDate(today);
 
         if (data.success && data.image) {
-          status.textContent = '已生成纪念图片';
-          status.className = 'status-value success';
+          status.textContent = '已生成';
+          status.className = 'status-badge success';
 
           content.innerHTML = `
-            <div class="image-container">
-              <img src="${data.image}" alt="今日纪念" />
+            <div class="memorial-frame">
+              <img src="${data.image}" alt="今日纪念" onload="this.classList.add('loaded')" />
             </div>
           `;
         } else {
-          status.textContent = '等待生成';
-          status.className = 'status-value pending';
+          status.textContent = '待生成';
+          status.className = 'status-badge pending';
           content.innerHTML = `
-            <div class="loading">
-              <p>今日纪念图片尚未生成</p>
-              <p>点击"重新生成"开始创建</p>
+            <div class="empty-state">
+              <p>今日纪念尚未生成<br>点击「重新生成」开始</p>
             </div>
           `;
         }
       } catch (error) {
-        status.textContent = '加载失败';
-        status.className = 'status-value';
+        status.textContent = '异常';
+        status.className = 'status-badge error';
         content.innerHTML = `
-          <div class="loading">
+          <div class="empty-state">
             <p>加载失败，请稍后重试</p>
           </div>
         `;
@@ -260,41 +355,41 @@
     async function regenerate() {
       const content = document.getElementById('content');
       const regenerateBtn = document.getElementById('regenerateBtn');
+      const status = document.getElementById('status');
 
       regenerateBtn.disabled = true;
+      status.textContent = '生成中';
+      status.className = 'status-badge pending';
+
       content.innerHTML = `
-        <div class="loading">
-          <div class="spinner"></div>
-          <p>AI 正在处理中...</p>
-          <p style="font-size: 14px; margin-top: 10px;">这可能需要几分钟时间</p>
+        <div class="loading-state">
+          <div class="loader"></div>
+          <p class="loading-text">AI 正在创作</p>
+          <p class="loading-hint">这可能需要几分钟</p>
         </div>
       `;
 
       try {
-        const response = await fetch('/api/memories/regenerate', {
-          method: 'POST'
-        });
+        const response = await fetch('/api/memories/regenerate', { method: 'POST' });
         const data = await response.json();
 
         if (data.success) {
           await loadToday();
         } else {
-          const msg = document.createElement('p');
-          msg.textContent = data.message || '生成失败';
-          content.innerHTML = '<div class="loading"></div>';
-          content.querySelector('.loading').appendChild(msg);
-          const btn = document.createElement('button');
-          btn.className = 'btn';
-          btn.style.marginTop = '20px';
-          btn.textContent = '返回';
-          btn.onclick = loadToday;
-          content.querySelector('.loading').appendChild(btn);
+          status.textContent = '失败';
+          status.className = 'status-badge error';
+          content.innerHTML = `
+            <div class="empty-state">
+              <p>${data.message || '生成失败'}</p>
+            </div>
+          `;
         }
       } catch (error) {
+        status.textContent = '异常';
+        status.className = 'status-badge error';
         content.innerHTML = `
-          <div class="loading">
+          <div class="empty-state">
             <p>生成失败，请稍后重试</p>
-            <button class="btn" onclick="loadToday()" style="margin-top: 20px;">返回</button>
           </div>
         `;
       } finally {
@@ -302,7 +397,6 @@
       }
     }
 
-    // 页面加载时自动获取今日纪念
     loadToday();
   </script>
 </body>

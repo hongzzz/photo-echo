@@ -21,4 +21,9 @@ data/
 # 临时文件
 *.tmp
 *.temp
+.temp/
 .DS_Store
+
+# 测试输出
+test-output/
+test/fixtures/
