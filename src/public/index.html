@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI 照片纪念系统</title>
+  <title>PhotoEcho</title>
   <style>
     * {
       margin: 0;
@@ -165,8 +165,8 @@
 <body>
   <div class="container">
     <div class="card">
-      <h1>AI 照片纪念系统</h1>
-      <p class="subtitle">用 AI 发现生活中的美好瞬间</p>
+      <h1>PhotoEcho</h1>
+      <p class="subtitle">历史照片的回响，AI 发现生活中的美好瞬间</p>
 
       <div class="status">
         <div class="status-item">
@@ -278,12 +278,16 @@
         if (data.success) {
           await loadToday();
         } else {
-          content.innerHTML = `
-            <div class="loading">
-              <p>${data.message || '生成失败'}</p>
-              <button class="btn" onclick="loadToday()" style="margin-top: 20px;">返回</button>
-            </div>
-          `;
+          const msg = document.createElement('p');
+          msg.textContent = data.message || '生成失败';
+          content.innerHTML = '<div class="loading"></div>';
+          content.querySelector('.loading').appendChild(msg);
+          const btn = document.createElement('button');
+          btn.className = 'btn';
+          btn.style.marginTop = '20px';
+          btn.textContent = '返回';
+          btn.onclick = loadToday;
+          content.querySelector('.loading').appendChild(btn);
         }
       } catch (error) {
         content.innerHTML = `

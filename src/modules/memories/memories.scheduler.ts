@@ -1,16 +1,28 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronJob } from 'cron';
 import { MemoriesService } from './memories.service';
 
 @Injectable()
-export class MemoriesScheduler {
+export class MemoriesScheduler implements OnModuleInit {
   private readonly logger = new Logger(MemoriesScheduler.name);
   private isProcessing = false;
 
-  constructor(private memoriesService: MemoriesService) {}
+  constructor(
+    private memoriesService: MemoriesService,
+    private configService: ConfigService,
+    private schedulerRegistry: SchedulerRegistry,
+  ) {}
 
-  // 每天凌晨 4 点执行
-  @Cron('0 4 * * *')
+  onModuleInit() {
+    const cronSchedule = this.configService.get<string>('app.system.cronSchedule') || '0 4 * * *';
+    const job = new CronJob(cronSchedule, () => this.handleCron());
+    this.schedulerRegistry.addCronJob('memories-daily', job);
+    job.start();
+    this.logger.log(`定时任务已注册，cron: ${cronSchedule}`);
+  }
+
   async handleCron() {
     if (this.isProcessing) {
       this.logger.log('上次任务尚未完成，跳过本次执行');

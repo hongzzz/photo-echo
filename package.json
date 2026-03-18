@@ -1,7 +1,7 @@
 {
-  "name": "ai-photo-selector",
+  "name": "photo-echo",
   "version": "2.0.0",
-  "description": "私有化媒体纪念系统 - NestJS 重构版",
+  "description": "PhotoEcho - 私有化媒体纪念系统",
   "main": "dist/main.js",
   "scripts": {
     "build": "nest build",

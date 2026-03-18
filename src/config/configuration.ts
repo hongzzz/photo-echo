@@ -19,6 +19,7 @@ export default registerAs('app', () => ({
     daysLookback: parseInt(process.env.YEARS_BACK || '5', 10),
     maxAssets: parseInt(process.env.MAX_ASSETS || '50', 10),
     port: parseInt(process.env.PORT || '3000', 10),
+    cronSchedule: process.env.CRON_SCHEDULE || '0 4 * * *',
   },
   // 数据库配置
   database: {

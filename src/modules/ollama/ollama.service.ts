@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as http from 'http';
+import * as https from 'https';
 import * as fs from 'fs';
 
 export interface MemoryScore {
@@ -26,7 +27,7 @@ export class OllamaService {
 
   constructor(private configService: ConfigService) {
     this.host = this.configService.get<string>('app.ollama.host') || 'http://localhost:11434';
-    this.modelPrimary = this.configService.get<string>('app.ollama.modelPrimary') || 'qwen3-vl:7b';
+    this.modelPrimary = this.configService.get<string>('app.ollama.modelPrimary') || 'qwen3-vl:8b';
     this.modelScreen = this.configService.get<string>('app.ollama.modelScreen') || 'moondream:1.8b';
   }
 
@@ -39,8 +40,10 @@ export class OllamaService {
       stream: false,
     });
 
+    const httpModule = url.protocol === 'https:' ? https : http;
+
     return new Promise((resolve, reject) => {
-      const req = http.request({
+      const req = httpModule.request({
         hostname: url.hostname,
         port: url.port || 11434,
         path: url.pathname,
@@ -49,6 +52,7 @@ export class OllamaService {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(body),
         },
+        timeout: 300_000, // 5 minutes
       }, (res) => {
         let data = '';
         res.on('data', (chunk) => data += chunk);
@@ -66,6 +70,10 @@ export class OllamaService {
         });
       });
 
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Ollama request timed out after 5 minutes'));
+      });
       req.on('error', reject);
       req.write(body);
       req.end();

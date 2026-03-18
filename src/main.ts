@@ -16,7 +16,7 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  console.log(`AI Photo Selector 已启动: http://localhost:${port}`);
+  console.log(`PhotoEcho 已启动: http://localhost:${port}`);
   console.log('可用 API:');
   console.log(`  GET  /            - 查看主页`);
   console.log(`  GET  /health      - 健康检查`);
