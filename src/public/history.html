@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhotoEcho - 历史回忆</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .header {
+      max-width: 1200px;
+      margin: 0 auto 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      color: white;
+      font-size: 1.8em;
+    }
+
+    .header a {
+      color: rgba(255,255,255,0.9);
+      text-decoration: none;
+      padding: 10px 20px;
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+
+    .header a:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    .grid {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .card img {
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: cover;
+      display: block;
+    }
+
+    .card-body {
+      padding: 16px;
+    }
+
+    .card-date {
+      font-size: 14px;
+      color: #667eea;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .card-caption {
+      font-size: 14px;
+      color: #555;
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-meta {
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #999;
+    }
+
+    .pagination {
+      max-width: 1200px;
+      margin: 30px auto;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .pagination button {
+      padding: 10px 24px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .pagination button:hover:not(:disabled) {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .pagination button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .pagination span {
+      color: rgba(255,255,255,0.9);
+      line-height: 40px;
+      font-size: 14px;
+    }
+
+    .empty {
+      text-align: center;
+      color: rgba(255,255,255,0.8);
+      padding: 80px 20px;
+      font-size: 18px;
+    }
+
+    .loading {
+      text-align: center;
+      color: rgba(255,255,255,0.8);
+      padding: 80px 20px;
+    }
+
+    .spinner {
+      border: 3px solid rgba(255,255,255,0.2);
+      border-top: 3px solid white;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Lightbox */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.9);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .lightbox.active {
+      display: flex;
+    }
+
+    .lightbox-content {
+      max-width: 900px;
+      width: 100%;
+      position: relative;
+    }
+
+    .lightbox-content img {
+      width: 100%;
+      border-radius: 12px;
+    }
+
+    .lightbox-caption {
+      color: rgba(255,255,255,0.9);
+      text-align: center;
+      margin-top: 16px;
+      font-size: 16px;
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
+
+    .lightbox-close {
+      position: absolute;
+      top: -40px;
+      right: 0;
+      color: white;
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      padding: 4px 12px;
+    }
+
+    .lightbox-date {
+      color: rgba(255,255,255,0.6);
+      text-align: center;
+      margin-top: 8px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>历史回忆</h1>
+    <a href="/">返回首页</a>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="loading" style="grid-column: 1 / -1;">
+      <div class="spinner"></div>
+      <p>加载中...</p>
+    </div>
+  </div>
+
+  <div class="pagination" id="pagination" style="display: none;">
+    <button id="prevBtn" onclick="loadPage(currentPage - 1)">上一页</button>
+    <span id="pageInfo"></span>
+    <button id="nextBtn" onclick="loadPage(currentPage + 1)">下一页</button>
+  </div>
+
+  <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+    <div class="lightbox-content">
+      <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+      <img id="lightbox-img" src="" alt="" />
+      <div class="lightbox-caption" id="lightbox-caption"></div>
+      <div class="lightbox-date" id="lightbox-date"></div>
+    </div>
+  </div>
+
+  <script>
+    const PAGE_SIZE = 12;
+    let currentPage = 1;
+    let totalItems = 0;
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const parts = dateStr.split('-');
+      return `${parts[0]}年${parseInt(parts[1])}月${parseInt(parts[2])}日`;
+    }
+
+    function openLightbox(id, caption, date) {
+      const lightbox = document.getElementById('lightbox');
+      const img = document.getElementById('lightbox-img');
+      const cap = document.getElementById('lightbox-caption');
+      const dt = document.getElementById('lightbox-date');
+      img.src = `/api/memories/${id}/image`;
+      cap.textContent = caption || '';
+      dt.textContent = formatDate(date);
+      lightbox.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox(event) {
+      if (event && event.target !== event.currentTarget) return;
+      const lightbox = document.getElementById('lightbox');
+      lightbox.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeLightbox();
+    });
+
+    async function loadPage(page) {
+      const grid = document.getElementById('grid');
+      const pagination = document.getElementById('pagination');
+
+      grid.innerHTML = `
+        <div class="loading" style="grid-column: 1 / -1;">
+          <div class="spinner"></div>
+          <p>加载中...</p>
+        </div>
+      `;
+
+      try {
+        const offset = (page - 1) * PAGE_SIZE;
+        const res = await fetch(`/api/memories/history?limit=${PAGE_SIZE}&offset=${offset}`);
+        const data = await res.json();
+
+        totalItems = data.total;
+        currentPage = page;
+        const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+
+        if (data.items.length === 0) {
+          grid.innerHTML = '<div class="empty" style="grid-column: 1 / -1;">暂无历史回忆</div>';
+          pagination.style.display = 'none';
+          return;
+        }
+
+        grid.innerHTML = data.items.map(item => `
+          <div class="card" onclick="openLightbox(${item.id}, ${JSON.stringify(item.caption || '').replace(/</g, '\\u003c')}, '${item.date}')">
+            <img src="/api/memories/${item.id}/image" alt="${formatDate(item.date)}" loading="lazy" />
+            <div class="card-body">
+              <div class="card-date">${formatDate(item.date)}</div>
+              <div class="card-caption">${item.caption || ''}</div>
+              <div class="card-meta">
+                <span>${item.style || ''}</span>
+                <span>${item.score != null ? '评分 ' + item.score.toFixed(1) : ''}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+        pagination.style.display = 'flex';
+        document.getElementById('prevBtn').disabled = page <= 1;
+        document.getElementById('nextBtn').disabled = page >= totalPages;
+        document.getElementById('pageInfo').textContent = `${page} / ${totalPages}`;
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (error) {
+        grid.innerHTML = '<div class="empty" style="grid-column: 1 / -1;">加载失败，请稍后重试</div>';
+      }
+    }
+
+    loadPage(1);
+  </script>
+</body>
+</html>

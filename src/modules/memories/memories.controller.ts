@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Query } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Res, NotFoundException } from '@nestjs/common';
+import { Response } from 'express';
 import { MemoriesService } from './memories.service';
-import { Memorial } from './entities/memorial.entity';
 
 @Controller('api/memories')
 export class MemoriesController {
@@ -20,9 +20,20 @@ export class MemoriesController {
   async getHistory(
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
-  ): Promise<Memorial[]> {
+  ) {
     const limitNum = limit ? parseInt(limit, 10) : 10;
     const offsetNum = offset ? parseInt(offset, 10) : 0;
     return this.memoriesService.getHistory(limitNum, offsetNum);
+  }
+
+  @Get(':id/image')
+  async getImage(@Param('id') id: string, @Res() res: Response) {
+    const result = await this.memoriesService.getMemorialImage(parseInt(id, 10));
+    if (!result) {
+      throw new NotFoundException('图片不存在');
+    }
+    res.set('Content-Type', result.mimeType);
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(result.buffer);
   }
 }

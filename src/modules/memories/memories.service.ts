@@ -205,12 +205,24 @@ export class MemoriesService {
     };
   }
 
-  async getHistory(limit: number = 10, offset: number = 0): Promise<Memorial[]> {
-    return this.memorialRepository.find({
+  async getHistory(limit: number = 10, offset: number = 0): Promise<{ items: Memorial[]; total: number }> {
+    const [items, total] = await this.memorialRepository.findAndCount({
       order: { createdAt: 'DESC' },
       take: limit,
       skip: offset,
     });
+    return { items, total };
+  }
+
+  async getMemorialImage(id: number): Promise<{ buffer: Buffer; mimeType: string } | null> {
+    const memorial = await this.memorialRepository.findOne({ where: { id } });
+    if (!memorial || !fs.existsSync(memorial.imagePath)) {
+      return null;
+    }
+    const buffer = fs.readFileSync(memorial.imagePath);
+    const ext = path.extname(memorial.imagePath).slice(1);
+    const mimeType = ext === 'jpg' ? 'jpeg' : ext;
+    return { buffer, mimeType: `image/${mimeType}` };
   }
 
   async regenerate(): Promise<{ success: boolean; message?: string; path?: string }> {
