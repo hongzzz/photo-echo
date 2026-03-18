@@ -11,6 +11,7 @@ export interface MemoryScore {
   historical: number;
   nostalgia: number;
   reason: string;
+  description: string;
 }
 
 export interface CaptionResult {
@@ -24,11 +25,13 @@ export class OllamaService {
   private host: string;
   private modelPrimary: string;
   private modelScreen: string;
+  private modelText: string;
 
   constructor(private configService: ConfigService) {
     this.host = this.configService.get<string>('app.ollama.host') || 'http://localhost:11434';
     this.modelPrimary = this.configService.get<string>('app.ollama.modelPrimary') || 'qwen3-vl:8b';
-    this.modelScreen = this.configService.get<string>('app.ollama.modelScreen') || 'moondream:1.8b';
+    this.modelScreen = this.configService.get<string>('app.ollama.modelScreen') || 'qwen3-vl:4b';
+    this.modelText = this.configService.get<string>('app.ollama.modelText') || 'qwen3:8b';
   }
 
   private async request<T>(model: string, payload: any): Promise<T> {
@@ -96,65 +99,94 @@ export class OllamaService {
 
     try {
       const base64Image = this.imageToBase64(imagePath);
+      const fileName = imagePath.split('/').pop();
+
+      this.logger.debug(`[粗筛] 开始筛选: ${fileName}, 模型: ${this.modelScreen}`);
+      const startTime = Date.now();
 
       const response = await this.request<{ response: string }>(this.modelScreen, {
         prompt,
         images: [base64Image],
       });
 
-      const result = (response.response || '').trim().toLowerCase();
-      return result.includes('是') || result.includes('yes') || result.includes('true');
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      const rawResult = (response.response || '').trim();
+      const result = rawResult.toLowerCase();
+      const pass = result.includes('是') || result.includes('yes') || result.includes('true');
+
+      this.logger.log(`[粗筛] ${fileName}: ${pass ? '通过' : '淘汰'} (${elapsed}s) 模型回复: "${rawResult.substring(0, 80)}"`);
+      return pass;
     } catch (error) {
-      this.logger.error('快速筛选失败', error);
+      this.logger.error(`[粗筛] 筛选失败: ${imagePath.split('/').pop()}, 默认通过`, error);
       return true;
     }
   }
 
   async deepScoreMemoryValue(imagePath: string): Promise<MemoryScore> {
-    const prompt = `你是一个专业的照片策展人。请深入分析这张照片的纪念价值，并给出专业评分。
+    const prompt = `/no_think
+你是一个专业的照片策展人。请仔细观察这张照片，完成两项任务：
 
-请从以下维度评分（0-10分）：
-1. 情感价值 - 照片中的人物情感、亲密时刻、家庭温暖
-2. 构图美感 - 画面构图、光影、色彩、视觉吸引力
-3. 历史意义 - 值得纪念的时刻、重要场景、成长记录
-4. 怀旧感 - 能唤起美好回忆的程度、时光印记
-5. 故事性 - 照片能否讲述一个动人的故事
+**任务一：画面描述**
+用 100-150 字详细描述画面内容，包括：人物、场景、动作、表情、光线、氛围等。
 
-最后给出综合评分和专业评语。
+**任务二：纪念价值评分（0-10分）**
+1. 情感价值(sentiment) - 人物情感、亲密时刻、家庭温暖
+2. 构图美感(composition) - 画面构图、光影、色彩
+3. 历史意义(historical) - 值得纪念的时刻、成长记录
+4. 怀旧感(nostalgia) - 能唤起美好回忆的程度
 
-请以 JSON 格式返回：
+综合评分(overall) = 四项维度的加权平均，不要随意拔高。
+
+请严格以 JSON 格式返回，不要输出其他内容：
 {
-  "sentiment": <情感价值评分>,
-  "composition": <构图美感评分>,
-  "historical": <历史意义评分>,
-  "nostalgia": <怀旧感评分>,
+  "description": "<画面描述，100-150字>",
+  "sentiment": <分数>,
+  "composition": <分数>,
+  "historical": <分数>,
+  "nostalgia": <分数>,
   "overall": <综合评分>,
   "reason": "<评语，50字以内>"
 }`;
 
     try {
       const base64Image = this.imageToBase64(imagePath);
+      const fileName = imagePath.split('/').pop();
+
+      this.logger.log(`[深度评分] 开始评分: ${fileName}, 模型: ${this.modelPrimary}`);
+      const startTime = Date.now();
 
       const response = await this.request<{ response: string }>(this.modelPrimary, {
         prompt,
         images: [base64Image],
       });
 
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       const resultText = response.response || '';
+
+      this.logger.debug(`[深度评分] 模型响应 (${elapsed}s): ${resultText.substring(0, 200)}${resultText.length > 200 ? '...' : ''}`);
+
       const jsonMatch = resultText.match(/\{[\s\S]*\}/);
 
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        return {
+        const score: MemoryScore = {
           sentiment: parsed.sentiment || 0,
           composition: parsed.composition || 0,
           historical: parsed.historical || 0,
           nostalgia: parsed.nostalgia || 0,
           overall: parsed.overall || 0,
           reason: parsed.reason || '',
+          description: parsed.description || '',
         };
+
+        this.logger.log(
+          `[深度评分] ${fileName}: 综合=${score.overall} | 情感=${score.sentiment} 构图=${score.composition} 历史=${score.historical} 怀旧=${score.nostalgia} | ${score.reason}`,
+        );
+        this.logger.debug(`[深度评分] ${fileName} 画面描述: ${score.description}`);
+        return score;
       }
 
+      this.logger.warn(`[深度评分] ${fileName}: JSON 解析失败，使用默认分数。原始响应: ${resultText.substring(0, 100)}`);
       return {
         sentiment: 5,
         composition: 5,
@@ -162,9 +194,10 @@ export class OllamaService {
         nostalgia: 5,
         overall: 5,
         reason: '评分解析失败',
+        description: '',
       };
     } catch (error) {
-      this.logger.error('深度评分失败', error);
+      this.logger.error(`[深度评分] 评分失败: ${imagePath.split('/').pop()}`, error);
       return {
         sentiment: 0,
         composition: 0,
@@ -172,45 +205,54 @@ export class OllamaService {
         nostalgia: 0,
         overall: 0,
         reason: '评分失败',
+        description: '',
       };
     }
   }
 
-  async generateCaption(imagePath: string, style: string = 'classical'): Promise<CaptionResult> {
-    const stylePrompts = {
-      classical: `请为这张照片生成一句古典诗意风格的纪念文案，要求：
-- 古风古韵，含蓄典雅
-- 2-4句话
-- 唤起对时光的感悟
-- 用诗意的语言表达情感`,
-      modern: `请为这张照片生成一句现代简约风格的纪念文案，要求：
-- 简洁有力，直击人心
-- 1-3句话
-- 符合当代审美
-- 温暖人心`,
-      nostalgic: `请为这张照片生成一句怀旧复古风格的纪念文案，要求：
-- 怀旧温暖，带有时光质感
-- 2-4句话
-- 唤起美好的回忆
-- 带有复古情怀`,
+  async generateCaption(description: string, style: string = 'classical'): Promise<CaptionResult> {
+    const styleGuide = {
+      classical: '古典诗意风格：古风古韵，含蓄典雅，用诗意的语言表达对时光的感悟',
+      modern: '现代简约风格：简洁有力，直击人心，温暖且符合当代审美',
+      nostalgic: '怀旧复古风格：怀旧温暖，带有时光质感，唤起美好回忆',
     };
 
-    try {
-      const base64Image = this.imageToBase64(imagePath);
+    const guide = styleGuide[style as keyof typeof styleGuide] || styleGuide.classical;
 
-      const response = await this.request<{ response: string }>(this.modelPrimary, {
-        prompt: stylePrompts[style as keyof typeof stylePrompts] || stylePrompts.classical,
-        images: [base64Image],
+    const prompt = `/no_think
+你是一位文案创作者。根据以下照片的画面描述，生成一段纪念文案。
+
+**画面描述：**
+${description}
+
+**风格要求：** ${guide}
+
+**格式要求：**
+- 2-4句话
+- 只输出文案本身，不要加引号、标题或解释
+
+请直接输出文案：`;
+
+    try {
+      this.logger.log(`[文案生成] 模型: ${this.modelText}, 风格: ${style}`);
+      this.logger.debug(`[文案生成] 画面描述: ${description.substring(0, 100)}`);
+      const startTime = Date.now();
+
+      const response = await this.request<{ response: string }>(this.modelText, {
+        prompt,
       });
 
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       const caption = (response.response || '').trim();
+
+      this.logger.log(`[文案生成] 完成 (${elapsed}s): ${caption}`);
 
       return {
         caption,
         style,
       };
     } catch (error) {
-      this.logger.error('生成文案失败', error);
+      this.logger.error('[文案生成] 生成失败', error);
       return {
         caption: '时光静好，岁月如歌',
         style,

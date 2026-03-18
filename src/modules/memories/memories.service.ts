@@ -120,8 +120,9 @@ export class MemoriesService {
       // 4. 生成纪念文案
       this.logger.log('\n[4/7] 生成纪念文案...');
       const stylePreference = this.configService.get<string>('app.system.stylePreference') || 'classical';
+      const imageDescription = bestAsset.score?.description || '';
       const captionResult = await this.ollamaService.generateCaption(
-        bestAsset.tempPath,
+        imageDescription,
         stylePreference
       );
 

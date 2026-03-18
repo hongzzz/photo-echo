@@ -10,7 +10,8 @@ export default registerAs('app', () => ({
   ollama: {
     host: process.env.OLLAMA_HOST || 'http://localhost:11434',
     modelPrimary: process.env.OLLAMA_MODEL_PRIMARY || 'qwen3-vl:7b',
-    modelScreen: process.env.OLLAMA_MODEL_SCREEN || 'moondream:1.8b',
+    modelScreen: process.env.OLLAMA_MODEL_SCREEN || 'qwen3-vl:4b',
+    modelText: process.env.OLLAMA_MODEL_TEXT || 'qwen3:8b',
   },
   // 系统配置
   system: {
