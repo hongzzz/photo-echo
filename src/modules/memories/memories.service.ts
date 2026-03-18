@@ -47,20 +47,20 @@ export class MemoriesService {
     const todayDate = today.toISOString().split('T')[0];
 
     try {
-      // 1. 获取历史照片
-      this.logger.log('\n[1/7] 检索历史照片...');
-      const daysLookback = this.configService.get<number>('app.system.daysLookback') || 365;
-      const assets = await this.immichService.getHistoricalPhotos(today, daysLookback);
+      // 1. 获取"历史上的今天"照片
+      this.logger.log('\n[1/7] 检索历史上的今天照片...');
+      const yearsBack = this.configService.get<number>('app.system.daysLookback') || 5;
+      const assets = await this.immichService.getHistoricalPhotos(today, yearsBack);
 
       if (assets.length === 0) {
-        this.logger.log('未找到历史照片');
+        this.logger.log('未找到历史上的今天照片');
         return null;
       }
 
-      this.logger.log(`找到 ${assets.length} 张历史照片`);
+      this.logger.log(`找到 ${assets.length} 张历史上的今天照片`);
 
-      // 2. 下载并粗筛照片
-      this.logger.log('\n[2/7] 下载并筛选照片...');
+      // 2. 下载照片并用 Moondream 快速筛选
+      this.logger.log('\n[2/7] 下载并快速筛选照片...');
       const maxAssets = this.configService.get<number>('app.system.maxAssets') || 50;
       const processedAssets: ProcessedAsset[] = [];
 
@@ -69,11 +69,16 @@ export class MemoriesService {
 
         try {
           await this.immichService.getThumbnail(asset.id, tempPath);
-          // 跳过快速筛选，统一使用主力模型进行深度评分
-          processedAssets.push({
-            ...asset,
-            tempPath,
-          });
+
+          // Moondream 快速筛选：过滤无纪念价值的照片
+          const pass = await this.ollamaService.quickScreen(tempPath);
+          if (pass) {
+            processedAssets.push({ ...asset, tempPath });
+            this.logger.debug(`  ✓ ${asset.originalFileName} 通过粗筛`);
+          } else {
+            this.logger.debug(`  ✗ ${asset.originalFileName} 未通过粗筛`);
+            fs.unlinkSync(tempPath);
+          }
         } catch (error) {
           this.logger.error(`处理图片 ${asset.id} 失败`, error);
         }
@@ -84,7 +89,7 @@ export class MemoriesService {
         return null;
       }
 
-      this.logger.log(`通过粗筛 ${processedAssets.length} 张照片`);
+      this.logger.log(`通过粗筛 ${processedAssets.length}/${Math.min(assets.length, maxAssets)} 张照片`);
 
       // 3. 深度评分和选择
       this.logger.log('\n[3/7] 深度评分...');

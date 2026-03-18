@@ -4,12 +4,13 @@ import {
   init,
   getAllAlbums,
   getAlbumInfo,
-  downloadAsset,
+  searchAssets,
+  viewAsset,
+  AssetMediaSize,
 } from '@immich/sdk';
 import * as fs from 'fs';
 import * as path from 'path';
 import sharp from 'sharp';
-import libheif from 'libheif-js';
 
 export interface Asset {
   id: string;
@@ -84,34 +85,38 @@ export class ImmichService implements OnModuleInit {
     }
   }
 
-  async getHistoricalPhotos(date: Date, daysLookback: number = 365): Promise<Asset[]> {
-    const albums = await this.getAlbums();
-    const allAssets: Array<{ asset: Asset; date: Date }> = [];
+  async getHistoricalPhotos(date: Date, yearsBack: number = 5): Promise<Asset[]> {
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const currentYear = date.getFullYear();
+    const allAssets: Asset[] = [];
 
-    for (const album of albums) {
-      if (album.assetCount === 0) continue;
+    // Search each previous year for photos on the same month/day
+    for (let y = currentYear - 1; y >= currentYear - yearsBack; y--) {
+      const dayStart = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00.000Z`;
+      const dayEnd = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T23:59:59.999Z`;
 
-      this.logger.debug(`读取相册: ${album.name} (${album.assetCount} 张)`);
-      const assets = await this.getAlbumAssets(album.id);
+      try {
+        this.logger.debug(`搜索 ${y}年${month}月${day}日 的照片...`);
+        const result = await searchAssets({
+          metadataSearchDto: {
+            takenAfter: dayStart,
+            takenBefore: dayEnd,
+            size: 200,
+          },
+        });
 
-      for (const asset of assets) {
-        const photoDate = asset.localDateTime || asset.takenAt || asset.exifInfo?.dateTimeOriginal;
-        if (photoDate) {
-          allAssets.push({
-            asset,
-            date: new Date(photoDate),
-          });
+        const assets = (result.assets?.items || []).map((a: any) => this.mapAsset(a));
+        if (assets.length > 0) {
+          this.logger.log(`  ${y}年${month}月${day}日: 找到 ${assets.length} 张`);
+          allAssets.push(...assets);
         }
+      } catch (error) {
+        this.logger.error(`搜索 ${y} 年照片失败`, error);
       }
     }
 
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysLookback);
-
-    const filtered = allAssets.filter(item => item.date >= cutoffDate);
-    filtered.sort((a, b) => b.date.getTime() - a.date.getTime());
-
-    return filtered.map(item => item.asset);
+    return allAssets;
   }
 
   getThumbnailUrl(assetId: string): string {
@@ -121,68 +126,15 @@ export class ImmichService implements OnModuleInit {
 
   async getThumbnail(assetId: string, savePath: string): Promise<string> {
     try {
-      const blob = await downloadAsset({ id: assetId });
+      // Use Immich's pre-rendered preview (JPEG) instead of downloading the original
+      // This avoids HEIC decoding issues and handles videos (returns a frame)
+      const blob = await viewAsset({ id: assetId, size: AssetMediaSize.Preview });
       const buffer = Buffer.from(await blob.arrayBuffer());
 
-      const jpegPath = savePath.replace(/\.(heic|heif|png|webp|tiff|bmp)$/i, '.jpg');
+      const jpegPath = savePath.replace(/\.[^.]+$/, '.jpg');
 
-      // Debug: log first few bytes to identify format
-      const magic = buffer.slice(0, 12).toString('hex');
-      this.logger.debug(`Buffer: ${buffer.length} bytes, magic: ${magic}`);
-
-      // Try sharp first for common formats
-      try {
-        await sharp(buffer).jpeg({ quality: 85 }).toFile(jpegPath);
-        return jpegPath;
-      } catch (sharpErr) {
-        this.logger.debug(`Sharp failed: ${sharpErr.message}`);
-      }
-
-      // Try libheif-js to decode HEIC
-      try {
-        const decoder = new libheif.HeifDecoder();
-        const images = decoder.decode(buffer);
-
-        if (!images || images.length === 0) {
-          this.logger.error(`Not a valid HEIC file, magic: ${magic}`);
-          throw new Error(`Not a valid HEIC file, magic: ${magic}`);
-        }
-
-        const image = images[0];
-        const width = image.get_width();
-        const height = image.get_height();
-
-        // Get image data via display() callback
-        const imageData = await new Promise<{ data: Buffer; width: number; height: number }>((resolve, reject) => {
-          const outData = new Uint8ClampedArray(width * height * 4);
-          image.display({ data: outData, width, height }, (displayData: any) => {
-            if (!displayData) {
-              reject(new Error('HEIF processing error'));
-            } else {
-              resolve({
-                data: Buffer.from(displayData.data),
-                width: displayData.width,
-                height: displayData.height,
-              });
-            }
-          });
-        });
-
-        await sharp(imageData.data, {
-          raw: {
-            width: imageData.width,
-            height: imageData.height,
-            channels: 4,
-          },
-        })
-          .jpeg({ quality: 85 })
-          .toFile(jpegPath);
-
-        return jpegPath;
-      } catch (heifErr) {
-        this.logger.error(`HEIC 解码失败: ${heifErr.message}`);
-        throw heifErr;
-      }
+      await sharp(buffer).jpeg({ quality: 85 }).toFile(jpegPath);
+      return jpegPath;
     } catch (error) {
       this.logger.error(`下载资产 ${assetId} 失败`, error);
       throw error;
