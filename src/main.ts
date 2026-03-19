@@ -14,9 +14,9 @@ async function bootstrap() {
   app.enableCors();
 
   const port = process.env.PORT || 3000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 
-  console.log(`PhotoEcho 已启动: http://localhost:${port}`);
+  console.log(`PhotoEcho 已启动: http://0.0.0.0:${port} (内网可访问)`);
   console.log('可用 API:');
   console.log(`  GET  /            - 查看主页`);
   console.log(`  GET  /health      - 健康检查`);
