@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PhotoEcho</title>
   <style>
     * {
@@ -25,6 +25,8 @@
       align-items: center;
       justify-content: center;
       padding: 40px 20px;
+      max-width: 100vw;
+      overflow-x: hidden;
     }
 
     .brand {
@@ -68,6 +70,7 @@
       box-shadow:
         0 2px 8px rgba(0,0,0,0.4),
         0 16px 48px rgba(0,0,0,0.3);
+      cursor: zoom-in;
     }
 
     .memorial-frame img {
@@ -75,6 +78,9 @@
       display: block;
       opacity: 0;
       transition: opacity 0.6s ease;
+      max-height: 60vh;
+      object-fit: contain;
+      background: #1a1816;
     }
 
     .memorial-frame img.loaded {
@@ -251,14 +257,87 @@
       line-height: 1.8;
     }
 
-    /* Responsive */
+    /* PC - constrain to viewport */
+    @media (min-width: 1024px) {
+      .page { padding: 24px 20px; }
+      .brand { margin-bottom: 28px; }
+      .brand h1 { font-size: 18px; }
+      .memorial { max-width: 560px; }
+      .memorial-frame img { max-height: 55vh; }
+      .memorial-info { padding: 18px 24px; }
+      .memorial-caption { font-size: 14px; }
+      .status-bar { margin-bottom: 20px; }
+      .actions { margin-top: 24px; }
+    }
+
+    /* Tablet */
+    @media (min-width: 481px) and (max-width: 1023px) {
+      .page { padding: 32px 20px; }
+      .brand { margin-bottom: 36px; }
+      .memorial { max-width: 580px; }
+      .memorial-frame img { max-height: 58vh; }
+    }
+
+    /* Lightbox */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.94);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .lightbox.active {
+      display: flex;
+    }
+
+    .lightbox img {
+      max-width: 100%;
+      max-height: 90vh;
+      object-fit: contain;
+      border-radius: 4px;
+      animation: lbFadeIn 0.3s ease;
+    }
+
+    @keyframes lbFadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .lightbox-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      color: rgba(232, 224, 216, 0.5);
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      padding: 8px;
+      line-height: 1;
+      transition: color 0.3s;
+      z-index: 1001;
+    }
+
+    .lightbox-close:hover {
+      color: rgba(232, 224, 216, 0.9);
+    }
+
+    /* Mobile */
     @media (max-width: 480px) {
       .page { padding: 24px 16px; }
       .brand h1 { font-size: 16px; letter-spacing: 6px; }
-      .brand { margin-bottom: 32px; }
+      .brand { margin-bottom: 24px; }
       .memorial-info { padding: 20px; }
       .memorial-caption { font-size: 14px; }
-      .actions { gap: 8px; }
+      .memorial-frame img { max-height: 50vh; }
+      .status-bar { margin-bottom: 20px; }
+      .actions { gap: 8px; margin-top: 24px; }
       .btn { padding: 10px 16px; font-size: 12px; }
     }
   </style>
@@ -290,7 +369,28 @@
     </div>
   </div>
 
+  <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+    <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+    <img id="lightbox-img" src="" alt="大图" />
+  </div>
+
   <script>
+    function openLightbox(src) {
+      const lb = document.getElementById('lightbox');
+      document.getElementById('lightbox-img').src = src;
+      lb.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox(event) {
+      if (event && event.target !== event.currentTarget && event.target.tagName !== 'BUTTON') return;
+      document.getElementById('lightbox').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeLightbox();
+    });
     function formatDate(dateStr) {
       const d = new Date(dateStr);
       return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
@@ -325,7 +425,7 @@
           status.className = 'status-badge success';
 
           content.innerHTML = `
-            <div class="memorial-frame">
+            <div class="memorial-frame" onclick="openLightbox('${data.image}')">
               <img src="${data.image}" alt="今日纪念" onload="this.classList.add('loaded')" />
             </div>
           `;

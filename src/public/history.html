@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PhotoEcho - 历史回忆</title>
   <style>
     * {
@@ -264,7 +264,14 @@
       color: rgba(232, 224, 216, 0.8);
     }
 
-    /* Responsive */
+    /* Tablet */
+    @media (min-width: 481px) and (max-width: 1023px) {
+      .grid { grid-template-columns: repeat(2, 1fr); max-width: 720px; }
+      .header { max-width: 720px; }
+      .pagination { max-width: 720px; }
+    }
+
+    /* Mobile */
     @media (max-width: 480px) {
       .header { padding: 24px 16px 20px; }
       .header h1 { font-size: 14px; letter-spacing: 4px; }

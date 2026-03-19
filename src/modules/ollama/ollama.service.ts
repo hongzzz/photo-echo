@@ -229,15 +229,15 @@ export class OllamaService {
 
   async generateCaption(description: string, style: string = 'classical'): Promise<CaptionResult> {
     const styleGuide = {
-      classical: '古典诗意风格：古风古韵，含蓄典雅，用诗意的语言表达对时光的感悟',
-      modern: '现代简约风格：简洁有力，直击人心，温暖且符合当代审美',
-      nostalgic: '怀旧复古风格：怀旧温暖，带有时光质感，唤起美好回忆',
+      classical: '含蓄隽永风格：用凝练、有意境的现代中文表达，不要用古诗词句式或文言文，要像散文随笔一样自然',
+      modern: '现代生活风格：像朋友圈文案一样真实自然，口语化但不随意，有温度有画面感，避免矫揉造作和空泛抒情',
+      nostalgic: '温暖回忆风格：用平实、温暖的叙述唤起回忆，像在跟老朋友聊起从前，不要华丽辞藻，要有生活气息',
     };
 
     const guide = styleGuide[style as keyof typeof styleGuide] || styleGuide.classical;
 
     const prompt = `/no_think
-你是一位文案创作者。根据以下照片的画面描述，生成一段纪念文案。
+你是一位文案创作者。根据以下照片的画面描述，写一段回忆文案。
 
 **画面描述：**
 ${description}
@@ -245,7 +245,9 @@ ${description}
 **风格要求：** ${guide}
 
 **格式要求：**
-- 2-4句话
+- 2-3句话，简短有力
+- 用现代白话文，禁止使用古诗词、文言文句式
+- 不要用"岁月""光阴""流转""静好""如歌"等陈词滥调
 - 只输出文案本身，不要加引号、标题或解释
 
 请直接输出文案：`;
@@ -271,7 +273,7 @@ ${description}
     } catch (error) {
       this.logger.error('[文案生成] 生成失败', error);
       return {
-        caption: '时光静好，岁月如歌',
+        caption: '翻到这张照片，忽然想起那天的阳光',
         style,
       };
     }

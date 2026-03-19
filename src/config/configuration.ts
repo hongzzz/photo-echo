@@ -16,7 +16,7 @@ export default registerAs('app', () => ({
   // 系统配置
   system: {
     outputDir: process.env.OUTPUT_DIR || './output',
-    stylePreference: process.env.STYLE_PREFERENCE || 'classical',
+    stylePreference: process.env.STYLE_PREFERENCE || 'modern',
     yearsBack: parseInt(process.env.YEARS_BACK || '5', 10),
     maxAssets: parseInt(process.env.MAX_ASSETS || '50', 10),
     port: parseInt(process.env.PORT || '3000', 10),
