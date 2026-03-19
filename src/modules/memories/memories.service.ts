@@ -16,6 +16,7 @@ export interface ProgressEvent {
   totalSteps: number;
   message: string;
   detail?: string;
+  done?: boolean;
 }
 
 interface ProcessedAsset extends Asset {
@@ -186,38 +187,28 @@ export class MemoriesService {
       // 6. 合成纪念图片
       this.logger.log('\n[6/7] 合成纪念图片...');
       this.emitProgress(6, 7, '合成纪念图片');
-      const outputDir = this.configService.get<string>('app.system.outputDir') || './output';
-      const outputPath = path.join(outputDir, `memorial_${todayDate}.jpg`);
 
       const takenDate = bestAsset.takenAt || bestAsset.localDateTime || bestAsset.createdAt;
       const photoDate = takenDate ? new Date(takenDate) : today;
 
-      const finalPath = await this.imageProcessorService.createMemorialCardWithDate(
+      const imageBuffer = await this.imageProcessorService.createMemorialCardWithDate(
         bestAsset.tempPath,
         captionResult.caption,
         photoDate,
         stylePreference,
-        outputPath
       );
 
-      this.logger.log(`纪念图片已保存: ${finalPath}`);
-
-      // 7. 清理临时文件
-      this.logger.log('\n[7/7] 清理临时文件...');
-      this.emitProgress(7, 7, '清理临时文件');
+      // 7. 清理临时文件并保存到数据库
+      this.logger.log('\n[7/7] 保存并清理...');
+      this.emitProgress(7, 7, '保存并清理');
       for (const asset of downloadedAssets) {
         if (asset.tempPath && fs.existsSync(asset.tempPath)) {
           fs.unlinkSync(asset.tempPath);
         }
       }
 
-      // 删除当天旧记录及其图片文件
+      // 删除当天旧记录
       const oldMemorials = await this.memorialRepository.find({ where: { date: todayDate } });
-      for (const old of oldMemorials) {
-        if (old.imagePath && fs.existsSync(old.imagePath)) {
-          fs.unlinkSync(old.imagePath);
-        }
-      }
       if (oldMemorials.length > 0) {
         await this.memorialRepository.remove(oldMemorials);
         this.logger.log(`已清理当天 ${oldMemorials.length} 条旧记录`);
@@ -226,7 +217,7 @@ export class MemoriesService {
       // 保存到数据库
       const memorial = this.memorialRepository.create({
         date: todayDate,
-        imagePath: finalPath,
+        imageData: imageBuffer,
         caption: captionResult.caption,
         sourceAssetId: bestAsset.id,
         sourceFileName: bestAsset.originalFileName,
@@ -240,11 +231,12 @@ export class MemoriesService {
       this.logger.log('处理完成!');
       this.logger.log('='.repeat(50));
 
-      return finalPath;
+      return todayDate;
     } catch (error) {
       this.logger.error('处理失败', error);
       return null;
     } finally {
+      this.progressSubject.next({ step: 7, totalSteps: 7, message: '完成', done: true });
       this._generating = false;
       this._lastProgress = null;
     }
@@ -256,9 +248,10 @@ export class MemoriesService {
     const memorial = await this.memorialRepository.findOne({
       where: { date: today },
       order: { createdAt: 'DESC' },
+      select: ['id', 'date', 'caption', 'score', 'style', 'createdAt'],
     });
 
-    if (memorial && fs.existsSync(memorial.imagePath)) {
+    if (memorial) {
       return {
         success: true,
         generating: this._generating,
@@ -287,34 +280,29 @@ export class MemoriesService {
       order: { createdAt: 'DESC' },
     });
 
-    if (!memorial || !fs.existsSync(memorial.imagePath)) {
+    if (!memorial || !memorial.imageData) {
       return null;
     }
 
-    const buffer = fs.readFileSync(memorial.imagePath);
-    const ext = path.extname(memorial.imagePath).slice(1);
-    const mimeType = ext === 'jpg' ? 'jpeg' : ext;
-    return { buffer, mimeType: `image/${mimeType}` };
+    return { buffer: memorial.imageData, mimeType: 'image/jpeg' };
   }
 
-  async getHistory(limit: number = 10, offset: number = 0): Promise<{ items: Memorial[]; total: number }> {
+  async getHistory(limit: number = 10, offset: number = 0): Promise<{ items: Omit<Memorial, 'imageData'>[]; total: number }> {
     const [items, total] = await this.memorialRepository.findAndCount({
       order: { createdAt: 'DESC' },
       take: limit,
       skip: offset,
+      select: ['id', 'date', 'caption', 'sourceAssetId', 'sourceFileName', 'score', 'style', 'createdAt'],
     });
     return { items, total };
   }
 
   async getMemorialImage(id: number): Promise<{ buffer: Buffer; mimeType: string } | null> {
     const memorial = await this.memorialRepository.findOne({ where: { id } });
-    if (!memorial || !fs.existsSync(memorial.imagePath)) {
+    if (!memorial || !memorial.imageData) {
       return null;
     }
-    const buffer = fs.readFileSync(memorial.imagePath);
-    const ext = path.extname(memorial.imagePath).slice(1);
-    const mimeType = ext === 'jpg' ? 'jpeg' : ext;
-    return { buffer, mimeType: `image/${mimeType}` };
+    return { buffer: memorial.imageData, mimeType: 'image/jpeg' };
   }
 
   async regenerate(): Promise<{ success: boolean; message?: string; path?: string }> {

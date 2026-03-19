@@ -1,24 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import sharp from 'sharp';
-import * as fs from 'fs';
-import * as path from 'path';
 
 @Injectable()
 export class ImageProcessorService {
   private readonly logger = new Logger(ImageProcessorService.name);
-  private outputDir: string;
-
-  constructor(private configService: ConfigService) {
-    this.outputDir = this.configService.get<string>('app.system.outputDir') || './output';
-    this.ensureOutputDir();
-  }
-
-  private ensureOutputDir(): void {
-    if (!fs.existsSync(this.outputDir)) {
-      fs.mkdirSync(this.outputDir, { recursive: true });
-    }
-  }
 
   private wrapText(text: string, maxCharsPerLine: number): string[] {
     const lines: string[] = [];
@@ -163,8 +148,7 @@ export class ImageProcessorService {
     imagePath: string,
     caption: string,
     styleName: string = 'classical',
-    outputPath?: string
-  ): Promise<string> {
+  ): Promise<Buffer> {
     const stylePresets = {
       classical: {
         fontSize: 52,
@@ -216,17 +200,7 @@ export class ImageProcessorService {
 
     const svg = this.createTextSVG(caption, style, width, height);
 
-    if (!outputPath) {
-      const date = new Date().toISOString().split('T')[0];
-      outputPath = path.join(this.outputDir, `memorial_${date}.jpg`);
-    }
-
-    const outputDir = path.dirname(outputPath);
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
-
-    await sharp(imagePath)
+    const buffer = await sharp(imagePath)
       .composite([
         {
           input: Buffer.from(svg),
@@ -234,10 +208,10 @@ export class ImageProcessorService {
         },
       ])
       .jpeg({ quality: 92 })
-      .toFile(outputPath);
+      .toBuffer();
 
-    this.logger.log(`纪念卡片已保存: ${outputPath}`);
-    return outputPath;
+    this.logger.log(`纪念卡片已生成 (${(buffer.length / 1024).toFixed(0)} KB)`);
+    return buffer;
   }
 
   async createMemorialCardWithDate(
@@ -245,11 +219,10 @@ export class ImageProcessorService {
     caption: string,
     date: Date,
     styleName: string = 'classical',
-    outputPath?: string
-  ): Promise<string> {
+  ): Promise<Buffer> {
     const dateStr = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
     const fullCaption = `${caption}\n\n—— ${dateStr} ——`;
 
-    return this.createMemorialCard(imagePath, fullCaption, styleName, outputPath);
+    return this.createMemorialCard(imagePath, fullCaption, styleName);
   }
 }

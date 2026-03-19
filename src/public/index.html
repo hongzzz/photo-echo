@@ -439,6 +439,14 @@
       evtSource.onmessage = function(e) {
         try {
           const data = JSON.parse(e.data);
+          if (data.done) {
+            evtSource.close();
+            // 进度条走满后延迟加载结果
+            const fill = document.getElementById('progressFill');
+            if (fill) fill.style.width = '100%';
+            setTimeout(() => loadToday(), 1000);
+            return;
+          }
           const pct = Math.round((data.step / data.totalSteps) * 100);
           const fill = document.getElementById('progressFill');
           const text = document.getElementById('progressText');
@@ -452,7 +460,7 @@
       };
       evtSource.onerror = function() {
         evtSource.close();
-        // 生成结束（成功或失败），重新加载
+        // 连接异常断开时也重新加载
         setTimeout(() => loadToday(), 1000);
       };
     }

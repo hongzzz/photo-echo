@@ -1,4 +1,5 @@
 import { registerAs } from '@nestjs/config';
+import * as path from 'path';
 
 export default registerAs('app', () => ({
   // Immich 配置
@@ -15,7 +16,6 @@ export default registerAs('app', () => ({
   },
   // 系统配置
   system: {
-    outputDir: process.env.OUTPUT_DIR || './output',
     stylePreference: process.env.STYLE_PREFERENCE || 'modern',
     yearsBack: parseInt(process.env.YEARS_BACK || '5', 10),
     maxAssets: parseInt(process.env.MAX_ASSETS || '50', 10),
@@ -24,6 +24,6 @@ export default registerAs('app', () => ({
   },
   // 数据库配置
   database: {
-    path: process.env.DATABASE_PATH || './data/memorials.db',
+    path: path.resolve(process.env.DATABASE_PATH || './data/memorials.db'),
   },
 }));

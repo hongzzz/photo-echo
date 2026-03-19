@@ -9,8 +9,8 @@ export class Memorial {
   @Column()
   date: string; // YYYY-MM-DD 格式
 
-  @Column()
-  imagePath: string; // 纪念卡片文件路径
+  @Column({ type: 'blob' })
+  imageData: Buffer; // 纪念卡片图片数据
 
   @Column({ nullable: true })
   caption: string; // 纪念文案
