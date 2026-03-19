@@ -378,11 +378,10 @@
         } else {
           status.textContent = '失败';
           status.className = 'status-badge error';
-          content.innerHTML = `
-            <div class="empty-state">
-              <p>${data.message || '生成失败'}</p>
-            </div>
-          `;
+          const msg = document.createElement('p');
+          msg.textContent = data.message || '生成失败';
+          content.innerHTML = '<div class="empty-state"></div>';
+          content.querySelector('.empty-state').appendChild(msg);
         }
       } catch (error) {
         status.textContent = '异常';

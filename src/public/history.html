@@ -323,11 +323,21 @@
       const img = document.getElementById('lightbox-img');
       const cap = document.getElementById('lightbox-caption');
       const dt = document.getElementById('lightbox-date');
-      img.src = `/api/memories/${id}/image`;
+      img.src = `/api/memories/${encodeURIComponent(id)}/image`;
       cap.textContent = caption || '';
       dt.textContent = formatDateCN(date);
       lightbox.classList.add('active');
       document.body.style.overflow = 'hidden';
+    }
+
+    function escapeAttr(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
     }
 
     function closeLightbox(event) {
@@ -338,6 +348,13 @@
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeLightbox();
+    });
+
+    // Event delegation for card clicks
+    document.getElementById('grid').addEventListener('click', (e) => {
+      const card = e.target.closest('.card');
+      if (!card) return;
+      openLightbox(card.dataset.id, card.dataset.caption, card.dataset.date);
     });
 
     async function loadPage(page) {
@@ -367,14 +384,14 @@
         }
 
         grid.innerHTML = data.items.map(item => `
-          <div class="card" onclick="openLightbox(${item.id}, ${JSON.stringify(item.caption || '').replace(/</g, '\\u003c')}, '${item.date}')">
-            <img src="/api/memories/${item.id}/image" alt="${formatDate(item.date)}" loading="lazy" />
+          <div class="card" data-id="${escapeAttr(item.id)}" data-caption="${escapeAttr(item.caption || '')}" data-date="${escapeAttr(item.date)}">
+            <img src="/api/memories/${encodeURIComponent(item.id)}/image" alt="${escapeAttr(formatDate(item.date))}" loading="lazy" />
             <div class="card-body">
-              <div class="card-date">${formatDate(item.date)}</div>
-              <div class="card-caption">${item.caption || ''}</div>
+              <div class="card-date">${escapeHtml(formatDate(item.date))}</div>
+              <div class="card-caption">${escapeHtml(item.caption || '')}</div>
               <div class="card-meta">
-                <span>${item.style || ''}</span>
-                <span>${item.score != null ? item.score.toFixed(1) + ' 分' : ''}</span>
+                <span>${escapeHtml(item.style || '')}</span>
+                <span>${item.score != null ? escapeHtml(item.score.toFixed(1) + ' 分') : ''}</span>
               </div>
             </div>
           </div>

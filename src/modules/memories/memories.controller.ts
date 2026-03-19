@@ -21,8 +21,8 @@ export class MemoriesController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    const limitNum = limit ? parseInt(limit, 10) : 10;
-    const offsetNum = offset ? parseInt(offset, 10) : 0;
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+    const offsetNum = Math.max(parseInt(offset, 10) || 0, 0);
     return this.memoriesService.getHistory(limitNum, offsetNum);
   }
 

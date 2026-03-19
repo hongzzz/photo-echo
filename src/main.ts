@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { networkInterfaces } from 'os';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -16,7 +17,15 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
 
-  console.log(`PhotoEcho 已启动: http://0.0.0.0:${port} (内网可访问)`);
+  const lanIp = Object.values(networkInterfaces())
+    .flat()
+    .find((i) => i && i.family === 'IPv4' && !i.internal)?.address;
+
+  console.log(`PhotoEcho 已启动:`);
+  console.log(`  本机: http://localhost:${port}`);
+  if (lanIp) {
+    console.log(`  内网: http://${lanIp}:${port}`);
+  }
   console.log('可用 API:');
   console.log(`  GET  /            - 查看主页`);
   console.log(`  GET  /health      - 健康检查`);

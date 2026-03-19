@@ -91,12 +91,16 @@ export class ImmichService implements OnModuleInit {
     const currentYear = date.getFullYear();
     const allAssets: Asset[] = [];
 
-    // Search each previous year for photos on the same month/day
-    for (let y = currentYear - 1; y >= currentYear - yearsBack; y--) {
-      const dayStart = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00.000Z`;
-      const dayEnd = `${y}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T23:59:59.999Z`;
+    // Search all previous years in parallel
+    const years = Array.from({ length: yearsBack }, (_, i) => currentYear - 1 - i);
+    const monthStr = String(month).padStart(2, '0');
+    const dayStr = String(day).padStart(2, '0');
 
-      try {
+    const results = await Promise.allSettled(
+      years.map(async (y) => {
+        const dayStart = `${y}-${monthStr}-${dayStr}T00:00:00.000Z`;
+        const dayEnd = `${y}-${monthStr}-${dayStr}T23:59:59.999Z`;
+
         this.logger.debug(`搜索 ${y}年${month}月${day}日 的照片...`);
         const result = await searchAssets({
           metadataSearchDto: {
@@ -109,10 +113,16 @@ export class ImmichService implements OnModuleInit {
         const assets = (result.assets?.items || []).map((a: any) => this.mapAsset(a));
         if (assets.length > 0) {
           this.logger.log(`  ${y}年${month}月${day}日: 找到 ${assets.length} 张`);
-          allAssets.push(...assets);
         }
-      } catch (error) {
-        this.logger.error(`搜索 ${y} 年照片失败`, error);
+        return assets;
+      }),
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        allAssets.push(...result.value);
+      } else {
+        this.logger.error('搜索照片失败', result.reason);
       }
     }
 

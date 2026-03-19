@@ -49,7 +49,7 @@ export class MemoriesService {
     try {
       // 1. 获取"历史上的今天"照片
       this.logger.log('\n[1/7] 检索历史上的今天照片...');
-      const yearsBack = this.configService.get<number>('app.system.daysLookback') || 5;
+      const yearsBack = this.configService.get<number>('app.system.yearsBack') || 5;
       const assets = await this.immichService.getHistoricalPhotos(today, yearsBack);
 
       if (assets.length === 0) {
@@ -59,28 +59,48 @@ export class MemoriesService {
 
       this.logger.log(`找到 ${assets.length} 张历史上的今天照片`);
 
-      // 2. 下载照片并用 Moondream 快速筛选
-      this.logger.log('\n[2/7] 下载并快速筛选照片...');
+      // 2. 并发下载缩略图
+      this.logger.log('\n[2/7] 下载缩略图...');
       const maxAssets = this.configService.get<number>('app.system.maxAssets') || 50;
+      const assetsToProcess = assets.slice(0, maxAssets);
+
+      const DOWNLOAD_CONCURRENCY = 5;
+      const downloadedAssets: ProcessedAsset[] = [];
+      for (let i = 0; i < assetsToProcess.length; i += DOWNLOAD_CONCURRENCY) {
+        const batch = assetsToProcess.slice(i, i + DOWNLOAD_CONCURRENCY);
+        const results = await Promise.allSettled(
+          batch.map(async (asset) => {
+            const tempPath = path.join(this.tempDir, `${asset.id}.jpg`);
+            await this.immichService.getThumbnail(asset.id, tempPath);
+            return { ...asset, tempPath } as ProcessedAsset;
+          }),
+        );
+        for (const result of results) {
+          if (result.status === 'fulfilled') {
+            downloadedAssets.push(result.value);
+          } else {
+            this.logger.error(`下载缩略图失败`, result.reason);
+          }
+        }
+      }
+
+      this.logger.log(`下载完成 ${downloadedAssets.length}/${assetsToProcess.length} 张`);
+
+      // 3. AI 粗筛（Ollama 单线程，逐张处理）
+      this.logger.log('\n[3/7] AI 粗筛...');
       const processedAssets: ProcessedAsset[] = [];
-
-      for (const asset of assets.slice(0, maxAssets)) {
-        const tempPath = path.join(this.tempDir, `${asset.id}.jpg`);
-
+      for (const asset of downloadedAssets) {
         try {
-          await this.immichService.getThumbnail(asset.id, tempPath);
-
-          // Moondream 快速筛选：过滤无纪念价值的照片
-          const pass = await this.ollamaService.quickScreen(tempPath);
+          const pass = await this.ollamaService.quickScreen(asset.tempPath!);
           if (pass) {
-            processedAssets.push({ ...asset, tempPath });
+            processedAssets.push(asset);
             this.logger.debug(`  ✓ ${asset.originalFileName} 通过粗筛`);
           } else {
             this.logger.debug(`  ✗ ${asset.originalFileName} 未通过粗筛`);
-            fs.unlinkSync(tempPath);
+            fs.unlinkSync(asset.tempPath!);
           }
         } catch (error) {
-          this.logger.error(`处理图片 ${asset.id} 失败`, error);
+          this.logger.error(`粗筛 ${asset.id} 失败`, error);
         }
       }
 
@@ -89,10 +109,10 @@ export class MemoriesService {
         return null;
       }
 
-      this.logger.log(`通过粗筛 ${processedAssets.length}/${Math.min(assets.length, maxAssets)} 张照片`);
+      this.logger.log(`通过粗筛 ${processedAssets.length}/${downloadedAssets.length} 张照片`);
 
-      // 3. 深度评分和选择
-      this.logger.log('\n[3/7] 深度评分...');
+      // 4. 深度评分和选择
+      this.logger.log('\n[4/7] 深度评分...');
       let bestAsset: ProcessedAsset | null = null;
       let bestScore = 0;
 
@@ -117,8 +137,8 @@ export class MemoriesService {
 
       this.logger.log(`\n最佳照片: ${bestAsset.originalFileName} (${bestScore}/10)`);
 
-      // 4. 生成纪念文案
-      this.logger.log('\n[4/7] 生成纪念文案...');
+      // 5. 生成纪念文案
+      this.logger.log('\n[5/7] 生成纪念文案...');
       const stylePreference = this.configService.get<string>('app.system.stylePreference') || 'classical';
       const imageDescription = bestAsset.score?.description || '';
       const captionResult = await this.ollamaService.generateCaption(
@@ -128,8 +148,8 @@ export class MemoriesService {
 
       this.logger.log(`生成的文案: ${captionResult.caption}`);
 
-      // 5. 合成纪念图片
-      this.logger.log('\n[5/7] 合成纪念图片...');
+      // 6. 合成纪念图片
+      this.logger.log('\n[6/7] 合成纪念图片...');
       const outputDir = this.configService.get<string>('app.system.outputDir') || './output';
       const outputPath = path.join(outputDir, `memorial_${todayDate}.jpg`);
 
@@ -143,16 +163,15 @@ export class MemoriesService {
 
       this.logger.log(`纪念图片已保存: ${finalPath}`);
 
-      // 6. 清理临时文件
-      this.logger.log('\n[6/7] 清理临时文件...');
-      for (const asset of processedAssets) {
+      // 7. 清理临时文件
+      this.logger.log('\n[7/7] 清理临时文件...');
+      for (const asset of downloadedAssets) {
         if (asset.tempPath && fs.existsSync(asset.tempPath)) {
           fs.unlinkSync(asset.tempPath);
         }
       }
 
-      // 7. 保存到数据库
-      this.logger.log('\n[7/7] 保存到数据库...');
+      // 保存到数据库
       const memorial = this.memorialRepository.create({
         date: todayDate,
         imagePath: finalPath,

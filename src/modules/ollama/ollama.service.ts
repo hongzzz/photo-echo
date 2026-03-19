@@ -34,7 +34,7 @@ export class OllamaService {
     this.modelText = this.configService.get<string>('app.ollama.modelText') || 'qwen3:8b';
   }
 
-  private async request<T>(model: string, payload: any): Promise<T> {
+  private async requestOnce<T>(model: string, payload: any, timeoutMs: number): Promise<T> {
     const url = new URL('/api/generate', this.host);
 
     const body = JSON.stringify({
@@ -55,7 +55,7 @@ export class OllamaService {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(body),
         },
-        timeout: 300_000, // 5 minutes
+        timeout: timeoutMs,
       }, (res) => {
         let data = '';
         res.on('data', (chunk) => data += chunk);
@@ -75,12 +75,29 @@ export class OllamaService {
 
       req.on('timeout', () => {
         req.destroy();
-        reject(new Error('Ollama request timed out after 5 minutes'));
+        reject(new Error(`Ollama request timed out after ${timeoutMs / 1000}s`));
       });
       req.on('error', reject);
       req.write(body);
       req.end();
     });
+  }
+
+  private async request<T>(model: string, payload: any, timeoutMs = 300_000, maxRetries = 1): Promise<T> {
+    let lastError: Error | undefined;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.requestOnce<T>(model, payload, timeoutMs);
+      } catch (error) {
+        lastError = error as Error;
+        if (attempt < maxRetries) {
+          const delay = (attempt + 1) * 2000;
+          this.logger.warn(`Ollama 请求失败，${delay / 1000}s 后重试 (${attempt + 1}/${maxRetries}): ${lastError.message}`);
+          await new Promise((r) => setTimeout(r, delay));
+        }
+      }
+    }
+    throw lastError;
   }
 
   private imageToBase64(imagePath: string): string {
@@ -107,7 +124,7 @@ export class OllamaService {
       const response = await this.request<{ response: string }>(this.modelScreen, {
         prompt,
         images: [base64Image],
-      });
+      }, 120_000);
 
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
       const rawResult = (response.response || '').trim();
@@ -199,12 +216,12 @@ export class OllamaService {
     } catch (error) {
       this.logger.error(`[深度评分] 评分失败: ${imagePath.split('/').pop()}`, error);
       return {
-        sentiment: 0,
-        composition: 0,
-        historical: 0,
-        nostalgia: 0,
-        overall: 0,
-        reason: '评分失败',
+        sentiment: 5,
+        composition: 5,
+        historical: 5,
+        nostalgia: 5,
+        overall: 5,
+        reason: '评分失败，使用默认分数',
         description: '',
       };
     }

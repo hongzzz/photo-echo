@@ -216,15 +216,6 @@ export class ImageProcessorService {
 
     const svg = this.createTextSVG(caption, style, width, height);
 
-    const processedBuffer = await sharp(imagePath)
-      .composite([
-        {
-          input: Buffer.from(svg),
-          gravity: style.position === 'bottom' ? 'south' : 'north',
-        },
-      ])
-      .toBuffer();
-
     if (!outputPath) {
       const date = new Date().toISOString().split('T')[0];
       outputPath = path.join(this.outputDir, `memorial_${date}.jpg`);
@@ -235,7 +226,13 @@ export class ImageProcessorService {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    await sharp(processedBuffer)
+    await sharp(imagePath)
+      .composite([
+        {
+          input: Buffer.from(svg),
+          gravity: style.position === 'bottom' ? 'south' : 'north',
+        },
+      ])
       .jpeg({ quality: 92 })
       .toFile(outputPath);
 

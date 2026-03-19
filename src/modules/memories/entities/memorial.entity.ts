@@ -1,10 +1,11 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from 'typeorm';
 
 @Entity()
 export class Memorial {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Index()
   @Column()
   date: string; // YYYY-MM-DD 格式
 

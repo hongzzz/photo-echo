@@ -17,7 +17,7 @@ export default registerAs('app', () => ({
   system: {
     outputDir: process.env.OUTPUT_DIR || './output',
     stylePreference: process.env.STYLE_PREFERENCE || 'classical',
-    daysLookback: parseInt(process.env.YEARS_BACK || '5', 10),
+    yearsBack: parseInt(process.env.YEARS_BACK || '5', 10),
     maxAssets: parseInt(process.env.MAX_ASSETS || '50', 10),
     port: parseInt(process.env.PORT || '3000', 10),
     cronSchedule: process.env.CRON_SCHEDULE || '0 4 * * *',
