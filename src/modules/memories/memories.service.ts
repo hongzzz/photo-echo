@@ -153,10 +153,13 @@ export class MemoriesService {
       const outputDir = this.configService.get<string>('app.system.outputDir') || './output';
       const outputPath = path.join(outputDir, `memorial_${todayDate}.jpg`);
 
+      const takenDate = bestAsset.takenAt || bestAsset.localDateTime || bestAsset.createdAt;
+      const photoDate = takenDate ? new Date(takenDate) : today;
+
       const finalPath = await this.imageProcessorService.createMemorialCardWithDate(
         bestAsset.tempPath,
         captionResult.caption,
-        today,
+        photoDate,
         stylePreference,
         outputPath
       );
