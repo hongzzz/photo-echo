@@ -245,6 +245,30 @@
       margin-top: 8px;
     }
 
+    .progress-bar {
+      width: 200px;
+      height: 2px;
+      background: rgba(232, 224, 216, 0.08);
+      border-radius: 1px;
+      margin: 20px auto 0;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: rgba(232, 224, 216, 0.35);
+      border-radius: 1px;
+      transition: width 0.4s ease;
+      width: 0%;
+    }
+
+    .progress-step {
+      font-size: 11px;
+      color: rgba(232, 224, 216, 0.25);
+      margin-top: 10px;
+      letter-spacing: 1px;
+    }
+
     /* Empty state */
     .empty-state {
       text-align: center;
@@ -396,6 +420,43 @@
       return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
     }
 
+    function showGeneratingUI(container, progress) {
+      const p = progress || {};
+      const pct = p.step && p.totalSteps ? Math.round((p.step / p.totalSteps) * 100) : 0;
+      container.innerHTML = `
+        <div class="loading-state">
+          <div class="loader"></div>
+          <p class="loading-text" id="progressText">${p.message || 'AI 正在创作'}</p>
+          <p class="loading-hint" id="progressDetail">${p.detail || ''}</p>
+          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:${pct}%"></div></div>
+          <p class="progress-step" id="progressStep">${p.step ? p.step + ' / ' + p.totalSteps : ''}</p>
+        </div>
+      `;
+    }
+
+    function waitForGeneration(content, status, regenerateBtn, refreshBtn) {
+      const evtSource = new EventSource('/api/memories/progress');
+      evtSource.onmessage = function(e) {
+        try {
+          const data = JSON.parse(e.data);
+          const pct = Math.round((data.step / data.totalSteps) * 100);
+          const fill = document.getElementById('progressFill');
+          const text = document.getElementById('progressText');
+          const detail = document.getElementById('progressDetail');
+          const step = document.getElementById('progressStep');
+          if (fill) fill.style.width = pct + '%';
+          if (text) text.textContent = data.message;
+          if (detail) detail.textContent = data.detail || '';
+          if (step) step.textContent = data.step + ' / ' + data.totalSteps;
+        } catch (_) {}
+      };
+      evtSource.onerror = function() {
+        evtSource.close();
+        // 生成结束（成功或失败），重新加载
+        setTimeout(() => loadToday(), 1000);
+      };
+    }
+
     async function loadToday() {
       const content = document.getElementById('content');
       const status = document.getElementById('status');
@@ -420,13 +481,23 @@
         const today = new Date().toISOString().split('T')[0];
         date.textContent = formatDate(today);
 
-        if (data.success && data.image) {
+        if (data.generating) {
+          status.textContent = '生成中';
+          status.className = 'status-badge pending';
+          regenerateBtn.disabled = true;
+          showGeneratingUI(content, data.progress);
+          waitForGeneration(content, status, regenerateBtn, refreshBtn);
+          return;
+        }
+
+        if (data.success) {
           status.textContent = '已生成';
           status.className = 'status-badge success';
 
+          const imgUrl = '/api/memories/today/image?t=' + Date.now();
           content.innerHTML = `
-            <div class="memorial-frame" onclick="openLightbox('${data.image}')">
-              <img src="${data.image}" alt="今日纪念" onload="this.classList.add('loaded')" />
+            <div class="memorial-frame" onclick="openLightbox('${imgUrl}')">
+              <img src="${imgUrl}" alt="今日纪念" onload="this.classList.add('loaded')" />
             </div>
           `;
         } else {
@@ -455,34 +526,29 @@
     async function regenerate() {
       const content = document.getElementById('content');
       const regenerateBtn = document.getElementById('regenerateBtn');
+      const refreshBtn = document.getElementById('refreshBtn');
       const status = document.getElementById('status');
 
       regenerateBtn.disabled = true;
+      refreshBtn.disabled = true;
       status.textContent = '生成中';
       status.className = 'status-badge pending';
 
-      content.innerHTML = `
-        <div class="loading-state">
-          <div class="loader"></div>
-          <p class="loading-text">AI 正在创作</p>
-          <p class="loading-hint">这可能需要几分钟</p>
-        </div>
-      `;
+      showGeneratingUI(content, null);
+      waitForGeneration(content, status, regenerateBtn, refreshBtn);
 
       try {
         const response = await fetch('/api/memories/regenerate', { method: 'POST' });
         const data = await response.json();
 
-        if (data.success) {
-          await loadToday();
-        } else {
+        if (!data.success) {
           status.textContent = '失败';
           status.className = 'status-badge error';
-          const msg = document.createElement('p');
-          msg.textContent = data.message || '生成失败';
-          content.innerHTML = '<div class="empty-state"></div>';
-          content.querySelector('.empty-state').appendChild(msg);
+          content.innerHTML = `<div class="empty-state"><p>${data.message || '生成失败'}</p></div>`;
+          regenerateBtn.disabled = false;
+          refreshBtn.disabled = false;
         }
+        // 成功时由 SSE onerror（连接关闭）触发 loadToday
       } catch (error) {
         status.textContent = '异常';
         status.className = 'status-badge error';
@@ -491,8 +557,8 @@
             <p>生成失败，请稍后重试</p>
           </div>
         `;
-      } finally {
         regenerateBtn.disabled = false;
+        refreshBtn.disabled = false;
       }
     }
 

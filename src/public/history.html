@@ -330,7 +330,7 @@
       const img = document.getElementById('lightbox-img');
       const cap = document.getElementById('lightbox-caption');
       const dt = document.getElementById('lightbox-date');
-      img.src = `/api/memories/${encodeURIComponent(id)}/image`;
+      img.src = `/api/memories/image/${encodeURIComponent(id)}`;
       cap.textContent = caption || '';
       dt.textContent = formatDateCN(date);
       lightbox.classList.add('active');
