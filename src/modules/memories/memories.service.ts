@@ -146,8 +146,8 @@ export class MemoriesService {
       }
 
       if (processedAssets.length === 0) {
-        this.logger.log('没有通过筛选的照片');
-        return null;
+        this.logger.log('没有通过粗筛的照片，跳过粗筛直接进入深度评分');
+        processedAssets.push(...downloadedAssets);
       }
 
       this.logger.log(`通过粗筛 ${processedAssets.length}/${downloadedAssets.length} 张照片`);
