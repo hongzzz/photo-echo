@@ -49,6 +49,13 @@ export class MemoriesService {
     this.progressSubject.next(this._lastProgress);
   }
 
+  private getLocalDateString(date: Date = new Date()): string {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
   constructor(
     @InjectRepository(Memorial)
     private memorialRepository: Repository<Memorial>,
@@ -75,7 +82,7 @@ export class MemoriesService {
     this.logger.log('='.repeat(50));
 
     const today = new Date();
-    const todayDate = today.toISOString().split('T')[0];
+    const todayDate = this.getLocalDateString(today);
 
     try {
       // 1. 获取"历史上的今天"照片
@@ -243,7 +250,7 @@ export class MemoriesService {
   }
 
   async getTodayMemorial() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = this.getLocalDateString();
 
     const memorial = await this.memorialRepository.findOne({
       where: { date: today },
@@ -273,7 +280,7 @@ export class MemoriesService {
   }
 
   async getTodayImage(): Promise<{ buffer: Buffer; mimeType: string } | null> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = this.getLocalDateString();
 
     const memorial = await this.memorialRepository.findOne({
       where: { date: today },
