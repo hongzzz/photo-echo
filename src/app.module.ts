@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
 
@@ -24,6 +25,9 @@ import { HealthModule } from './modules/health/health.module';
 
     // 定时任务模块
     ScheduleModule.forRoot(),
+
+    // 限流
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 10 }]),
 
     // 静态文件服务
     ServeStaticModule.forRoot({

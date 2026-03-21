@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { networkInterfaces } from 'os';
 import { AppModule } from './app.module';
 
@@ -9,10 +10,21 @@ async function bootstrap() {
   // 启用验证管道
   app.useGlobalPipes(new ValidationPipe({
     transform: true,
+    whitelist: true,
   }));
 
   // 启用 CORS
-  app.enableCors();
+  const corsOrigin = process.env.CORS_ORIGIN;
+  app.enableCors(corsOrigin ? { origin: corsOrigin.split(',') } : undefined);
+
+  // Swagger API 文档
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('PhotoEcho API')
+    .setDescription('私有化媒体纪念系统 API')
+    .setVersion('2.0')
+    .build();
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');

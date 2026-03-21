@@ -34,13 +34,15 @@ describe('ImageProcessorService', () => {
 
     service = module.get<ImageProcessorService>(ImageProcessorService);
 
-    // Create fixtures dir
+    // Create output and fixtures dirs
+    if (!fs.existsSync(TEST_OUTPUT)) {
+      fs.mkdirSync(TEST_OUTPUT, { recursive: true });
+    }
     if (!fs.existsSync(TEST_FIXTURES)) {
       fs.mkdirSync(TEST_FIXTURES, { recursive: true });
     }
 
     // Try to use an existing image, otherwise generate one
-    const existingImage = path.join(process.cwd(), 'output', 'memorial_2026-03-18.jpg');
     const existingTemp = (() => {
       const tempDir = path.join(process.cwd(), '.temp');
       if (!fs.existsSync(tempDir)) return null;
@@ -50,8 +52,6 @@ describe('ImageProcessorService', () => {
 
     if (existingTemp && fs.existsSync(existingTemp)) {
       testImagePath = existingTemp;
-    } else if (fs.existsSync(existingImage)) {
-      testImagePath = existingImage;
     } else {
       testImagePath = path.join(TEST_FIXTURES, 'test-photo.jpg');
       await sharp({
@@ -77,107 +77,114 @@ describe('ImageProcessorService', () => {
   });
 
   it('should generate classical style card', async () => {
-    const output = path.join(TEST_OUTPUT, 'test-classical.jpg');
     const result = await service.createMemorialCard(
       testImagePath,
       '岁月如歌，那些被时间温柔拥抱的瞬间，终会在记忆的长河中熠熠生辉',
       'classical',
-      output,
     );
 
-    expect(fs.existsSync(result)).toBe(true);
+    expect(Buffer.isBuffer(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
     const meta = await sharp(result).metadata();
     expect(meta.width).toBeGreaterThan(0);
     expect(meta.format).toBe('jpeg');
-    console.log(`  classical: ${meta.width}x${meta.height} → ${result}`);
+
+    fs.writeFileSync(path.join(TEST_OUTPUT, 'test-classical.jpg'), result);
+    console.log(`  classical: ${meta.width}x${meta.height}`);
   });
 
   it('should generate modern style card', async () => {
-    const output = path.join(TEST_OUTPUT, 'test-modern.jpg');
     const result = await service.createMemorialCard(
       testImagePath,
       '生活不在别处，就在每一个被认真对待的日常里',
       'modern',
-      output,
     );
 
-    expect(fs.existsSync(result)).toBe(true);
+    expect(Buffer.isBuffer(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
     const meta = await sharp(result).metadata();
     expect(meta.format).toBe('jpeg');
-    console.log(`  modern: ${meta.width}x${meta.height} → ${result}`);
+
+    fs.writeFileSync(path.join(TEST_OUTPUT, 'test-modern.jpg'), result);
+    console.log(`  modern: ${meta.width}x${meta.height}`);
   });
 
   it('should generate nostalgic style card', async () => {
-    const output = path.join(TEST_OUTPUT, 'test-nostalgic.jpg');
     const result = await service.createMemorialCard(
       testImagePath,
       '那年夏天的风，吹过旧时光的窗棂，带来一缕温暖的记忆',
       'nostalgic',
-      output,
     );
 
-    expect(fs.existsSync(result)).toBe(true);
+    expect(Buffer.isBuffer(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
     const meta = await sharp(result).metadata();
     expect(meta.format).toBe('jpeg');
-    console.log(`  nostalgic: ${meta.width}x${meta.height} → ${result}`);
+
+    fs.writeFileSync(path.join(TEST_OUTPUT, 'test-nostalgic.jpg'), result);
+    console.log(`  nostalgic: ${meta.width}x${meta.height}`);
   });
 
   it('should generate card with date overlay', async () => {
-    const output = path.join(TEST_OUTPUT, 'test-with-date.jpg');
     const testDate = new Date('2023-06-15');
     const result = await service.createMemorialCardWithDate(
       testImagePath,
       '阳光洒满窗台，猫咪慵懒地蜷缩在角落',
       testDate,
       'classical',
-      output,
     );
 
-    expect(fs.existsSync(result)).toBe(true);
+    expect(Buffer.isBuffer(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
     const meta = await sharp(result).metadata();
     expect(meta.format).toBe('jpeg');
-    console.log(`  with-date: ${meta.width}x${meta.height} → ${result}`);
+
+    fs.writeFileSync(path.join(TEST_OUTPUT, 'test-with-date.jpg'), result);
+    console.log(`  with-date: ${meta.width}x${meta.height}`);
   });
 
   it('should handle long caption with wrapping', async () => {
-    const output = path.join(TEST_OUTPUT, 'test-long-caption.jpg');
     const longCaption = '人生若只如初见，何事秋风悲画扇。等闲变却故人心，却道故人心易变。骊山语罢清宵半，泪雨霖铃终不怨。';
     const result = await service.createMemorialCard(
       testImagePath,
       longCaption,
       'classical',
-      output,
     );
 
-    expect(fs.existsSync(result)).toBe(true);
-    console.log(`  long-caption → ${result}`);
+    expect(Buffer.isBuffer(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+
+    fs.writeFileSync(path.join(TEST_OUTPUT, 'test-long-caption.jpg'), result);
+    console.log(`  long-caption: ${result.length} bytes`);
   });
 
   it('should handle multiline caption', async () => {
-    const output = path.join(TEST_OUTPUT, 'test-multiline.jpg');
     const caption = '第一行文案\n第二行文案\n第三行文案';
     const result = await service.createMemorialCard(
       testImagePath,
       caption,
       'modern',
-      output,
     );
 
-    expect(fs.existsSync(result)).toBe(true);
-    console.log(`  multiline → ${result}`);
+    expect(Buffer.isBuffer(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+
+    fs.writeFileSync(path.join(TEST_OUTPUT, 'test-multiline.jpg'), result);
+    console.log(`  multiline: ${result.length} bytes`);
   });
 
   it('should fallback to classical for unknown style', async () => {
-    const output = path.join(TEST_OUTPUT, 'test-unknown-style.jpg');
     const result = await service.createMemorialCard(
       testImagePath,
       '未知风格回退测试',
       'nonexistent',
-      output,
     );
 
-    expect(fs.existsSync(result)).toBe(true);
-    console.log(`  unknown-style fallback → ${result}`);
+    expect(Buffer.isBuffer(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+
+    fs.writeFileSync(path.join(TEST_OUTPUT, 'test-unknown-style.jpg'), result);
+    console.log(`  unknown-style fallback: ${result.length} bytes`);
   });
 
   it('should compare all 3 styles side by side', async () => {
@@ -185,15 +192,16 @@ describe('ImageProcessorService', () => {
     const styles = ['classical', 'modern', 'nostalgic'] as const;
 
     for (const style of styles) {
-      const output = path.join(TEST_OUTPUT, `compare-${style}.jpg`);
-      await service.createMemorialCardWithDate(
+      const result = await service.createMemorialCardWithDate(
         testImagePath,
         caption,
         new Date('2024-12-25'),
         style,
-        output,
       );
-      const meta = await sharp(output).metadata();
+
+      expect(Buffer.isBuffer(result)).toBe(true);
+      fs.writeFileSync(path.join(TEST_OUTPUT, `compare-${style}.jpg`), result);
+      const meta = await sharp(result).metadata();
       console.log(`  ${style}: ${meta.width}x${meta.height}`);
     }
 

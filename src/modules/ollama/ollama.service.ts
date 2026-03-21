@@ -19,6 +19,11 @@ export interface CaptionResult {
   style: string;
 }
 
+interface OllamaRequestPayload {
+  prompt: string;
+  images?: string[];
+}
+
 @Injectable()
 export class OllamaService {
   private readonly logger = new Logger(OllamaService.name);
@@ -34,7 +39,7 @@ export class OllamaService {
     this.modelText = this.configService.get<string>('app.ollama.modelText') || 'qwen3:8b';
   }
 
-  private async requestOnce<T>(model: string, payload: any, timeoutMs: number): Promise<T> {
+  private async requestOnce<T>(model: string, payload: OllamaRequestPayload, timeoutMs: number): Promise<T> {
     const url = new URL('/api/generate', this.host);
 
     const body = JSON.stringify({
@@ -83,7 +88,7 @@ export class OllamaService {
     });
   }
 
-  private async request<T>(model: string, payload: any, timeoutMs = 300_000, maxRetries = 1): Promise<T> {
+  private async request<T>(model: string, payload: OllamaRequestPayload, timeoutMs = 300_000, maxRetries = 1): Promise<T> {
     let lastError: Error | undefined;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {

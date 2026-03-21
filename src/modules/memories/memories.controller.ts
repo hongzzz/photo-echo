@@ -1,22 +1,30 @@
 import { Controller, Get, Post, Param, Query, Res, Sse, NotFoundException, MessageEvent } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { Observable, map } from 'rxjs';
 import { MemoriesService } from './memories.service';
+import { HistoryQueryDto } from './dto/memories.dto';
 
+@ApiTags('memories')
 @Controller('api/memories')
 export class MemoriesController {
   constructor(private readonly memoriesService: MemoriesService) {}
 
+  @ApiOperation({ summary: '获取今日纪念元数据' })
   @Get('today')
   async getToday() {
     return this.memoriesService.getTodayMemorial();
   }
 
+  @ApiOperation({ summary: '重新生成今日纪念' })
+  @Throttle({ default: { ttl: 60_000, limit: 2 } })
   @Post('regenerate')
   async regenerate() {
     return this.memoriesService.regenerate();
   }
 
+  @ApiOperation({ summary: 'SSE 实时进度推送' })
   @Sse('progress')
   progress(): Observable<MessageEvent> {
     return this.memoriesService.progress$.pipe(
@@ -24,6 +32,7 @@ export class MemoriesController {
     );
   }
 
+  @ApiOperation({ summary: '获取今日纪念卡片图片' })
   @Get('today/image')
   async getTodayImage(@Res() res: Response) {
     const result = await this.memoriesService.getTodayImage();
@@ -35,16 +44,13 @@ export class MemoriesController {
     res.send(result.buffer);
   }
 
+  @ApiOperation({ summary: '获取历史纪念记录' })
   @Get('history')
-  async getHistory(
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
-    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
-    const offsetNum = Math.max(parseInt(offset, 10) || 0, 0);
-    return this.memoriesService.getHistory(limitNum, offsetNum);
+  async getHistory(@Query() query: HistoryQueryDto) {
+    return this.memoriesService.getHistory(query.limit ?? 10, query.offset ?? 0);
   }
 
+  @ApiOperation({ summary: '获取指定纪念卡片图片' })
   @Get('image/:id')
   async getImage(@Param('id') id: string, @Res() res: Response) {
     const numId = parseInt(id, 10);

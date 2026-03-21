@@ -299,10 +299,10 @@
     <button id="nextBtn" onclick="loadPage(currentPage + 1)">下一页</button>
   </div>
 
-  <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <div class="lightbox" id="lightbox" role="dialog" aria-label="图片预览" onclick="closeLightbox(event)">
     <div class="lightbox-content">
-      <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
-      <img id="lightbox-img" src="" alt="" />
+      <button class="lightbox-close" aria-label="关闭预览" onclick="closeLightbox()">&times;</button>
+      <img id="lightbox-img" src="" alt="纪念卡片大图" />
       <div class="lightbox-caption" id="lightbox-caption"></div>
       <div class="lightbox-date" id="lightbox-date"></div>
     </div>

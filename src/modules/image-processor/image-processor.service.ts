@@ -1,6 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import sharp from 'sharp';
 
+interface StylePreset {
+  fontSize: number;
+  color: string;
+  dateColor: string;
+  position: string;
+  align: string;
+  lineHeight: number;
+  maxWidth: number;
+  shadow: boolean;
+  textOpacity: number;
+  letterSpacing: number;
+  fontFamily: string;
+}
+
 @Injectable()
 export class ImageProcessorService {
   private readonly logger = new Logger(ImageProcessorService.name);
@@ -47,7 +61,7 @@ export class ImageProcessorService {
     return Math.max(4, maxChars); // 至少 4 个字
   }
 
-  private createTextSVG(text: string, style: any, width: number, height: number): string {
+  private createTextSVG(text: string, style: StylePreset, width: number, height: number): string {
     const maxCharsPerLine = this.calcMaxCharsPerLine(width, style.fontSize, style.letterSpacing);
     const allLines = this.wrapText(text, maxCharsPerLine);
 

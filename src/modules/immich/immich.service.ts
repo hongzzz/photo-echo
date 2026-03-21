@@ -7,6 +7,7 @@ import {
   searchAssets,
   viewAsset,
   AssetMediaSize,
+  AssetResponseDto,
 } from '@immich/sdk';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -110,7 +111,7 @@ export class ImmichService implements OnModuleInit {
           },
         });
 
-        const assets = (result.assets?.items || []).map((a: any) => this.mapAsset(a));
+        const assets = (result.assets?.items || []).map((a) => this.mapAsset(a));
         if (assets.length > 0) {
           this.logger.log(`  ${y}年${month}月${day}日: 找到 ${assets.length} 张`);
         }
@@ -151,7 +152,7 @@ export class ImmichService implements OnModuleInit {
     }
   }
 
-  private mapAsset(asset: any): Asset {
+  private mapAsset(asset: AssetResponseDto): Asset {
     return {
       id: asset.id,
       originalFileName: asset.originalFileName || 'unknown',

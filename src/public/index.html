@@ -394,9 +394,9 @@
     </div>
   </div>
 
-  <div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
-    <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
-    <img id="lightbox-img" src="" alt="大图" />
+  <div class="lightbox" id="lightbox" role="dialog" aria-label="图片预览" onclick="closeLightbox(event)">
+    <button class="lightbox-close" aria-label="关闭预览" onclick="closeLightbox()">&times;</button>
+    <img id="lightbox-img" src="" alt="纪念卡片大图" />
   </div>
 
   <script>

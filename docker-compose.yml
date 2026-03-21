@@ -1,0 +1,23 @@
+services:
+  photo-echo:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    env_file: .env
+    restart: unless-stopped
+    # depends_on:
+    #   - ollama
+
+  # Ollama AI inference (uncomment if needed)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   restart: unless-stopped
+
+# volumes:
+#   ollama_data:
