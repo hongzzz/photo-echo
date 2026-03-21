@@ -29,7 +29,7 @@ import { HealthModule } from './modules/health/health.module';
     ServeStaticModule.forRoot({
       rootPath: join(process.cwd(), 'src', 'public'),
       serveRoot: '/',
-      exclude: ['/api*'],
+      exclude: ['/api{*splat}'],
     }),
 
     // TypeORM + SQLite
