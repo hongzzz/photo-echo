@@ -40,8 +40,16 @@ export class ImageProcessorService {
     return /^——.*——$/.test(line.trim());
   }
 
+  private calcMaxCharsPerLine(width: number, fontSize: number, letterSpacing: number): number {
+    const horizontalPadding = 80; // 左右各 40px 留白
+    const charWidth = fontSize + (letterSpacing || 0);
+    const maxChars = Math.floor((width - horizontalPadding) / charWidth);
+    return Math.max(4, maxChars); // 至少 4 个字
+  }
+
   private createTextSVG(text: string, style: any, width: number, height: number): string {
-    const allLines = this.wrapText(text, style.maxWidth);
+    const maxCharsPerLine = this.calcMaxCharsPerLine(width, style.fontSize, style.letterSpacing);
+    const allLines = this.wrapText(text, maxCharsPerLine);
 
     const dateLineIndex = allLines.findIndex(l => this.isDateLine(l));
     const captionLines = dateLineIndex >= 0 ? allLines.slice(0, dateLineIndex) : allLines;
