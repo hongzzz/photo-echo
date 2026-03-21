@@ -10,9 +10,11 @@
 - 三模型 AI 流水线：qwen3-vl:4b 粗筛 → qwen3-vl:8b 评分描述 → qwen3:8b 文案生成
 - "视觉→文本→文案"两阶段架构：多模态模型看图提取描述，纯文本模型生成文案
 - 基于画面描述生成艺术风格中文纪念文案（古典 / 现代 / 怀旧）
-- Sharp + SVG 合成带文字叠加的纪念卡片
+- Sharp + SVG 合成带文字叠加的纪念卡片，根据图片宽度动态排版
+- 纪念卡片以 blob 存储于 SQLite，无文件系统依赖
 - 每天凌晨 4 点自动执行，也可通过 Web 界面手动触发
-- 单页 Web 界面查看今日纪念和历史记录
+- SSE 实时进度推送
+- Web 界面查看今日纪念和历史记录
 
 ## 依赖服务
 
@@ -41,9 +43,9 @@ cp .env.example .env
 ### 3. 安装并运行
 
 ```bash
-npm install
-npm run build
-npm run start
+pnpm install
+pnpm run build
+pnpm run start
 ```
 
 访问 `http://localhost:3000` 查看 Web 界面。
@@ -51,7 +53,7 @@ npm run start
 ### 开发模式
 
 ```bash
-npm run start:dev
+pnpm run start:dev
 ```
 
 ## 三模型架构
@@ -72,8 +74,7 @@ npm run start:dev
 | `OLLAMA_MODEL_PRIMARY` | `qwen3-vl:8b` | 深度评分 + 画面描述模型 |
 | `OLLAMA_MODEL_SCREEN` | `qwen3-vl:4b` | 快速粗筛模型 |
 | `OLLAMA_MODEL_TEXT` | `qwen3:8b` | 文案生成模型 |
-| `OUTPUT_DIR` | `./output` | 纪念卡片输出目录 |
-| `STYLE_PREFERENCE` | `classical` | 文案风格: classical / modern / nostalgic |
+| `STYLE_PREFERENCE` | `modern` | 文案风格: classical / modern / nostalgic |
 | `PORT` | `3000` | 服务端口 |
 | `YEARS_BACK` | `5` | 向前追溯多少年 |
 | `MAX_ASSETS` | `50` | 每年最多处理照片数 |
@@ -85,13 +86,16 @@ npm run start:dev
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/health` | 健康检查 |
-| GET | `/api/memories/today` | 获取今日纪念（base64 图片） |
+| GET | `/api/memories/today` | 今日纪念元数据 (JSON) |
+| GET | `/api/memories/today/image` | 今日纪念卡片图片 |
 | POST | `/api/memories/regenerate` | 重新生成今日纪念 |
+| GET | `/api/memories/progress` | SSE 实时进度推送 |
 | GET | `/api/memories/history?limit=10&offset=0` | 历史记录（分页） |
+| GET | `/api/memories/image/:id` | 指定纪念卡片图片 |
 
 ## 技术栈
 
-NestJS 10 · TypeScript · SQLite + TypeORM · Sharp · @immich/sdk · @nestjs/schedule
+NestJS 11 · TypeScript · SQLite + TypeORM · Sharp · @immich/sdk · @nestjs/schedule
 
 ## 许可证
 
