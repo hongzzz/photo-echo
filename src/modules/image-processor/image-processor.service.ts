@@ -41,7 +41,7 @@ export class ImageProcessorService {
   }
 
   private calcMaxCharsPerLine(width: number, fontSize: number, letterSpacing: number): number {
-    const horizontalPadding = 80; // 左右各 40px 留白
+    const horizontalPadding = Math.round(fontSize * 1.6); // 左右留白随字体缩放
     const charWidth = fontSize + (letterSpacing || 0);
     const maxChars = Math.floor((width - horizontalPadding) / charWidth);
     return Math.max(4, maxChars); // 至少 4 个字
@@ -57,14 +57,16 @@ export class ImageProcessorService {
 
     const filteredCaptionLines = captionLines.filter(l => l.trim() !== '');
 
-    const lineHeight = style.fontSize * style.lineHeight;
-    const dateSize = Math.round(style.fontSize * 0.5);
+    const fontSize = style.fontSize;
+    const lineHeight = fontSize * style.lineHeight;
+    const dateSize = Math.round(fontSize * 0.5);
     const dateLineHeight = dateSize * 2;
     const letterSpacing = style.letterSpacing || 0;
 
-    // Layout calculation
-    const paddingBottom = 56;
-    const paddingBetween = dateLine ? 28 : 0;
+    // Layout calculation - 间距随字体等比缩放
+    const sizeRatio = fontSize / 52; // 以 classical 52px 为基准
+    const paddingBottom = Math.round(56 * sizeRatio);
+    const paddingBetween = dateLine ? Math.round(28 * sizeRatio) : 0;
     const captionHeight = filteredCaptionLines.length * lineHeight;
     const dateHeight = dateLine ? dateLineHeight : 0;
     const contentHeight = captionHeight + paddingBetween + dateHeight + paddingBottom;
@@ -206,7 +208,16 @@ export class ImageProcessorService {
     const width = metadata.width || 1200;
     const height = metadata.height || 800;
 
-    const svg = this.createTextSVG(caption, style, width, height);
+    // 根据图片宽度动态缩放字体大小，以 1200px 宽度为基准
+    const baseWidth = 1200;
+    const scale = Math.min(width / baseWidth, 1); // 小图缩小，大图不超过预设值
+    const scaledStyle = {
+      ...style,
+      fontSize: Math.round(style.fontSize * scale),
+      letterSpacing: Math.round(style.letterSpacing * scale),
+    };
+
+    const svg = this.createTextSVG(caption, scaledStyle, width, height);
 
     const buffer = await sharp(imagePath)
       .composite([
