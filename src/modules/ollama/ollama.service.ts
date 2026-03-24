@@ -12,6 +12,10 @@ export interface MemoryScore {
   nostalgia: number;
   reason: string;
   description: string;
+  caption?: string;
+  hasPeople?: boolean;
+  hasPets?: boolean;
+  isTravel?: boolean;
 }
 
 export interface CaptionResult {
@@ -144,10 +148,41 @@ export class OllamaService {
     }
   }
 
-  async deepScoreMemoryValue(imagePath: string): Promise<MemoryScore> {
-    const prompt = `/no_think
-你是一个专业的照片策展人。请仔细观察这张照片，完成两项任务：
+  async deepScoreMemoryValue(imagePath: string, style: string = 'classical', metadata?: {
+    takenAt?: string;
+    location?: string;
+    peopleNames?: string[];
+  }): Promise<MemoryScore> {
+    const styleGuide: Record<string, string> = {
+      classical: '含蓄隽永风格：用凝练、有意境的现代中文表达，不要用古诗词句式或文言文，要像散文随笔一样自然',
+      modern: '现代生活风格：像朋友圈文案一样真实自然，口语化但不随意，有温度有画面感，避免矫揉造作和空泛抒情',
+      nostalgic: '温暖回忆风格：用平实、温暖的叙述唤起回忆，像在跟老朋友聊起从前，不要华丽辞藻，要有生活气息',
+    };
+    const guide = styleGuide[style] || styleGuide.classical;
 
+    // 构建元数据上下文
+    const contextLines: string[] = [];
+    if (metadata?.takenAt) {
+      const takenDate = new Date(metadata.takenAt);
+      const now = new Date();
+      const yearsAgo = now.getFullYear() - takenDate.getFullYear();
+      const dateStr = `${takenDate.getFullYear()}年${takenDate.getMonth() + 1}月${takenDate.getDate()}日`;
+      contextLines.push(`- 拍摄时间：${dateStr}（${yearsAgo}年前的今天）`);
+    }
+    if (metadata?.location) {
+      contextLines.push(`- 拍摄地点：${metadata.location}`);
+    }
+    if (metadata?.peopleNames && metadata.peopleNames.length > 0) {
+      contextLines.push(`- 照片中的人物：${metadata.peopleNames.join('、')}`);
+    }
+
+    const metadataSection = contextLines.length > 0
+      ? `\n**已知信息（来自照片元数据）：**\n${contextLines.join('\n')}\n请结合以上信息来评分和创作文案。\n`
+      : '';
+
+    const prompt = `/no_think
+你是一个专业的照片策展人和文案创作者。请仔细观察这张照片，完成三项任务：
+${metadataSection}
 **任务一：画面描述**
 用 100-150 字详细描述画面内容，包括：人物、场景、动作、表情、光线、氛围等。
 
@@ -159,6 +194,19 @@ export class OllamaService {
 
 综合评分(overall) = 四项维度的加权平均，不要随意拔高。
 
+**特征检测（用于加权）：**
+- has_people: 画面中是否有人物（true/false）
+- has_pets: 画面中是否有宠物/动物（true/false）
+- is_travel: 是否为旅行/出游场景，如景点、异地风景、旅途中等（true/false）
+
+**任务三：纪念文案**
+根据你对这张照片的观察和已知信息，直接写一段回忆文案。
+- ${guide}
+- 1-2句话，总共不超过30个字
+- 用现代白话文，禁止使用古诗词、文言文句式
+- 不要用"岁月""光阴""流转""静好""如歌"等陈词滥调
+- 可以融入地点、人物等具体细节，让文案更有辨识度
+
 请严格以 JSON 格式返回，不要输出其他内容：
 {
   "description": "<画面描述，100-150字>",
@@ -167,7 +215,11 @@ export class OllamaService {
   "historical": <分数>,
   "nostalgia": <分数>,
   "overall": <综合评分>,
-  "reason": "<评语，50字以内>"
+  "reason": "<评语，50字以内>",
+  "caption": "<纪念文案，不超过30字>",
+  "has_people": <true或false>,
+  "has_pets": <true或false>,
+  "is_travel": <true或false>
 }`;
 
     try {
@@ -190,19 +242,43 @@ export class OllamaService {
       const jsonMatch = resultText.match(/\{[\s\S]*\}/);
 
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
+        // 清理 JSON 字符串值中的控制字符（模型有时在描述中输出换行符等）
+        const cleanedJson = jsonMatch[0].replace(/[\x00-\x1F\x7F]/g, (ch) => {
+          if (ch === '\n' || ch === '\r' || ch === '\t') return ' ';
+          return '';
+        });
+        const parsed = JSON.parse(cleanedJson);
+        const hasPeople = !!parsed.has_people;
+        const hasPets = !!parsed.has_pets;
+        const isTravel = !!parsed.is_travel;
+
+        // 基于特征的加权：有人物 +1.5，有宠物 +1.0，旅行场景 +1.0
+        let bonus = 0;
+        const bonusTags: string[] = [];
+        if (hasPeople) { bonus += 1.5; bonusTags.push('人物+1.5'); }
+        if (hasPets) { bonus += 1.0; bonusTags.push('宠物+1.0'); }
+        if (isTravel) { bonus += 1.0; bonusTags.push('旅行+1.0'); }
+
+        const rawOverall = parsed.overall || 0;
+        const adjustedOverall = Math.min(10, rawOverall + bonus);
+
         const score: MemoryScore = {
           sentiment: parsed.sentiment || 0,
           composition: parsed.composition || 0,
           historical: parsed.historical || 0,
           nostalgia: parsed.nostalgia || 0,
-          overall: parsed.overall || 0,
+          overall: adjustedOverall,
           reason: parsed.reason || '',
           description: parsed.description || '',
+          caption: parsed.caption || '',
+          hasPeople,
+          hasPets,
+          isTravel,
         };
 
+        const bonusInfo = bonusTags.length > 0 ? ` | 加权: ${bonusTags.join(', ')} (原始=${rawOverall})` : '';
         this.logger.log(
-          `[深度评分] ${fileName}: 综合=${score.overall} | 情感=${score.sentiment} 构图=${score.composition} 历史=${score.historical} 怀旧=${score.nostalgia} | ${score.reason}`,
+          `[深度评分] ${fileName}: 综合=${score.overall} | 情感=${score.sentiment} 构图=${score.composition} 历史=${score.historical} 怀旧=${score.nostalgia}${bonusInfo} | ${score.reason}`,
         );
         this.logger.debug(`[深度评分] ${fileName} 画面描述: ${score.description}`);
         return score;
@@ -233,6 +309,15 @@ export class OllamaService {
   }
 
   async generateCaption(description: string, style: string = 'classical'): Promise<CaptionResult> {
+    // 文本模型未配置时直接返回默认文案
+    if (!this.modelText || this.modelText.trim() === '') {
+      this.logger.warn('[文案生成] 文本模型未配置 (OLLAMA_MODEL_TEXT)，使用默认文案');
+      return {
+        caption: '翻到这张照片，忽然想起那天的阳光',
+        style,
+      };
+    }
+
     const styleGuide = {
       classical: '含蓄隽永风格：用凝练、有意境的现代中文表达，不要用古诗词句式或文言文，要像散文随笔一样自然',
       modern: '现代生活风格：像朋友圈文案一样真实自然，口语化但不随意，有温度有画面感，避免矫揉造作和空泛抒情',

@@ -21,6 +21,8 @@ export default registerAs('app', () => ({
     maxAssets: parseInt(process.env.MAX_ASSETS || '50', 10),
     port: parseInt(process.env.PORT || '3000', 10),
     cronSchedule: process.env.CRON_SCHEDULE || '0 4 * * *',
+    skipScreen: process.env.SKIP_SCREEN === 'true',
+    screenThreshold: parseInt(process.env.SCREEN_THRESHOLD || '20', 10),
   },
   // 数据库配置
   database: {

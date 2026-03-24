@@ -126,41 +126,63 @@ export class MemoriesService {
 
       this.logger.log(`下载完成 ${downloadedAssets.length}/${assetsToProcess.length} 张`);
 
-      // 3. AI 粗筛（Ollama 单线程，逐张处理）
+      // 3. AI 粗筛（可跳过）
       this.logger.log('\n[3/7] AI 粗筛...');
       this.emitProgress(3, 7, 'AI 粗筛', `${downloadedAssets.length} 张待筛选`);
       const processedAssets: ProcessedAsset[] = [];
-      for (const asset of downloadedAssets) {
-        try {
-          const pass = await this.ollamaService.quickScreen(asset.tempPath!);
-          if (pass) {
-            processedAssets.push(asset);
-            this.logger.debug(`  ✓ ${asset.originalFileName} 通过粗筛`);
-          } else {
-            this.logger.debug(`  ✗ ${asset.originalFileName} 未通过粗筛`);
-            fs.unlinkSync(asset.tempPath!);
+      const skipScreen = this.configService.get<boolean>('app.system.skipScreen');
+      const screenThreshold = this.configService.get<number>('app.system.screenThreshold') || 20;
+
+      if (skipScreen || downloadedAssets.length <= screenThreshold) {
+        const reason = skipScreen ? 'SKIP_SCREEN=true' : `候选数量 ${downloadedAssets.length} ≤ 阈值 ${screenThreshold}`;
+        this.logger.log(`跳过粗筛（${reason}），直接进入深度评分`);
+        processedAssets.push(...downloadedAssets);
+      } else {
+        for (const asset of downloadedAssets) {
+          try {
+            const pass = await this.ollamaService.quickScreen(asset.tempPath!);
+            if (pass) {
+              processedAssets.push(asset);
+              this.logger.debug(`  ✓ ${asset.originalFileName} 通过粗筛`);
+            } else {
+              this.logger.debug(`  ✗ ${asset.originalFileName} 未通过粗筛`);
+              fs.unlinkSync(asset.tempPath!);
+            }
+          } catch (error) {
+            this.logger.error(`粗筛 ${asset.id} 失败`, error);
           }
-        } catch (error) {
-          this.logger.error(`粗筛 ${asset.id} 失败`, error);
+        }
+
+        if (processedAssets.length === 0) {
+          this.logger.log('没有通过粗筛的照片，跳过粗筛直接进入深度评分');
+          processedAssets.push(...downloadedAssets);
         }
       }
 
-      if (processedAssets.length === 0) {
-        this.logger.log('没有通过粗筛的照片，跳过粗筛直接进入深度评分');
-        processedAssets.push(...downloadedAssets);
-      }
-
-      this.logger.log(`通过粗筛 ${processedAssets.length}/${downloadedAssets.length} 张照片`);
+      this.logger.log(`进入深度评分: ${processedAssets.length}/${downloadedAssets.length} 张照片`);
 
       // 4. 深度评分和选择
       this.logger.log('\n[4/7] 深度评分...');
       this.emitProgress(4, 7, '深度评分', `${processedAssets.length} 张待评分`);
+      const stylePreference = this.configService.get<string>('app.system.stylePreference') || 'classical';
       let bestAsset: ProcessedAsset | null = null;
       let bestScore = 0;
 
       for (const asset of processedAssets) {
         if (asset.tempPath) {
-          const score = await this.ollamaService.deepScoreMemoryValue(asset.tempPath);
+          // 构建元数据上下文
+          const locationParts = [
+            asset.exifInfo?.city,
+            asset.exifInfo?.state,
+            asset.exifInfo?.country,
+          ].filter(Boolean);
+          const metadata = {
+            takenAt: asset.takenAt || asset.localDateTime,
+            location: locationParts.length > 0 ? locationParts.join(', ') : undefined,
+            peopleNames: asset.peopleNames,
+          };
+
+          const score = await this.ollamaService.deepScoreMemoryValue(asset.tempPath, stylePreference, metadata);
           asset.score = score;
 
           this.logger.log(`  - ${asset.originalFileName}: ${score.overall}/10`);
@@ -182,14 +204,22 @@ export class MemoriesService {
       // 5. 生成纪念文案
       this.logger.log('\n[5/7] 生成纪念文案...');
       this.emitProgress(5, 7, '生成纪念文案');
-      const stylePreference = this.configService.get<string>('app.system.stylePreference') || 'classical';
-      const imageDescription = bestAsset.score?.description || '';
-      const captionResult = await this.ollamaService.generateCaption(
-        imageDescription,
-        stylePreference
-      );
+      let captionResult: { caption: string; style: string };
 
-      this.logger.log(`生成的文案: ${captionResult.caption}`);
+      const directCaption = bestAsset.score?.caption;
+      if (directCaption) {
+        this.logger.log(`使用多模态模型直接生成的文案: ${directCaption}`);
+        captionResult = { caption: directCaption, style: stylePreference };
+      } else {
+        this.logger.warn('多模态模型未返回文案，降级使用文本模型生成');
+        const imageDescription = bestAsset.score?.description || '';
+        captionResult = await this.ollamaService.generateCaption(
+          imageDescription,
+          stylePreference
+        );
+      }
+
+      this.logger.log(`最终文案: ${captionResult.caption}`);
 
       // 6. 合成纪念图片
       this.logger.log('\n[6/7] 合成纪念图片...');

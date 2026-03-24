@@ -62,11 +62,11 @@ photo-echo/
 
 `MemoriesService.processMemories()` 执行 7 步流程：
 
-1. **照片检索**: 从 Immich 获取同月同日历史照片 (跨多年)
+1. **照片检索**: 从 Immich 获取同月同日历史照片 (跨多年)，提取 GPS 地点、人物名等元数据
 2. **缩略图下载**: 使用 Immich preview API，5 路并发下载 (避免 HEIC/视频兼容问题)
-3. **AI 粗筛**: 快速判断是否有纪念价值（若全部未通过则跳过粗筛直接进入评分）
-4. **AI 精选**: 多维度评分 (情感/构图/历史/怀旧, 0-10 分) + 画面描述
-5. **文案生成**: 基于画面描述生成中文纪念文案 (3 种风格，纯文本模型)
+3. **AI 粗筛**: 快速判断是否有纪念价值（可配置跳过，候选数 ≤ 阈值时自动跳过）
+4. **AI 精选**: 多维度评分 + 特征检测（人物/宠物/旅行加权）+ 直接生成文案，传入拍摄时间、地点、人物等元数据
+5. **文案确认**: 使用多模态模型直接生成的文案（降级时用文本模型基于描述生成）
 6. **图片合成**: Sharp SVG 叠加文字，根据图片实际宽度动态换行
 7. **持久化**: 图片以 blob 存入 SQLite，清理临时文件
 
@@ -91,9 +91,9 @@ IMMICH_API_KEY=your_api_key_here
 
 # Ollama
 OLLAMA_HOST=http://localhost:11434
-OLLAMA_MODEL_PRIMARY=qwen3-vl:8b    # 深度评分 + 画面描述（多模态）
-OLLAMA_MODEL_SCREEN=qwen3-vl:4b     # 粗筛（多模态轻量）
-OLLAMA_MODEL_TEXT=qwen3:8b           # 文案生成（纯文本）
+OLLAMA_MODEL_PRIMARY=qwen3-vl:8b    # 必需：多模态主力模型（评分+文案+特征检测）
+# OLLAMA_MODEL_SCREEN=qwen3-vl:4b   # 可选：粗筛模型，留空或不配置则跳过粗筛
+# OLLAMA_MODEL_TEXT=qwen3:8b         # 可选：文案降级模型，主力模型已直接生成文案
 
 # 系统
 STYLE_PREFERENCE=modern    # classical | modern | nostalgic
@@ -104,6 +104,8 @@ PORT=3000
 # MAX_ASSETS=50                       # 最多处理多少张照片
 # DATABASE_PATH=./data/memorials.db   # SQLite 数据库路径
 # CRON_SCHEDULE=0 4 * * *             # 定时任务 cron 表达式
+# SKIP_SCREEN=true                    # 跳过粗筛步骤
+# SCREEN_THRESHOLD=20                 # 候选照片数 ≤ 此值时自动跳过粗筛（默认20）
 ```
 
 ## 开发命令
@@ -130,24 +132,31 @@ pnpm run start:prod # 生产模式 (node dist/main)
 
 ## Ollama 模型准备
 
-首次运行前需下载模型：
+首次运行前需下载主力模型（必需）：
 
 ```bash
-ollama pull qwen3-vl:4b      # 粗筛模型（多模态轻量，快速筛选）
-ollama pull qwen3-vl:8b      # 主力模型（多模态，深度评分 + 画面描述）
-ollama pull qwen3:8b          # 文案模型（纯文本，基于描述生成文案）
+ollama pull qwen3-vl:8b      # 主力模型（必需：评分 + 特征检测 + 文案生成）
 ```
 
-### 三模型架构
+以下模型为可选，按需下载：
 
-| 模型 | 配置项 | 用途 | 类型 |
+```bash
+ollama pull qwen3-vl:4b      # 可选：粗筛模型（候选照片多时加速筛选）
+ollama pull qwen3:8b          # 可选：文案降级模型（主力模型未返回文案时的 fallback）
+```
+
+### 模型架构
+
+| 模型 | 配置项 | 用途 | 必需 |
 |------|--------|------|------|
-| qwen3-vl:4b | OLLAMA_MODEL_SCREEN | 粗筛：快速判断照片是否有纪念价值 | 多模态（轻量） |
-| qwen3-vl:8b | OLLAMA_MODEL_PRIMARY | 深度评分：四维评分 + 100-150 字画面描述 | 多模态（主力） |
-| qwen3:8b | OLLAMA_MODEL_TEXT | 文案生成：基于画面描述生成纪念文案 | 纯文本 |
+| qwen3-vl:8b | OLLAMA_MODEL_PRIMARY | 主力：四维评分 + 特征检测 + 直接看图生成文案 | 是 |
+| qwen3-vl:4b | OLLAMA_MODEL_SCREEN | 粗筛：快速判断照片是否有纪念价值 | 否 |
+| qwen3:8b | OLLAMA_MODEL_TEXT | 降级：主力模型未返回文案时的 fallback | 否 |
 
 > 评分维度：情感价值 / 构图美感 / 历史意义 / 怀旧感，综合分为加权平均。
-> 文案生成采用"视觉→文本→文案"两阶段流水线，由多模态模型提取画面内容，再由纯文本模型生成文案。
+> 特征检测：自动识别人物、宠物、旅行场景，给予评分加权（人物+1.5，宠物+1.0，旅行+1.0）。
+> 元数据增强：从 Immich 提取拍摄时间、GPS 地点、人脸识别人物名，传递给模型辅助生成更精准的文案。
+> 粗筛策略：候选照片数 ≤ SCREEN_THRESHOLD（默认20）时自动跳过粗筛；也可设置 SKIP_SCREEN=true 强制跳过。
 
 ## 数据库
 

@@ -105,20 +105,20 @@ describe('MemoriesService', () => {
       // Step 3: Quick screen
       ollamaService.quickScreen.mockResolvedValue(true);
 
-      // Step 4: Deep score
+      // Step 4: Deep score (caption included from multimodal model)
       ollamaService.deepScoreMemoryValue
         .mockResolvedValueOnce({
           overall: 7, sentiment: 7, composition: 8, historical: 6, nostalgia: 7,
-          reason: '不错', description: '一张美丽的照片',
+          reason: '不错', description: '一张美丽的照片', caption: '春天的午后',
         })
         .mockResolvedValueOnce({
           overall: 9, sentiment: 9, composition: 8, historical: 8, nostalgia: 9,
-          reason: '很好', description: '温馨的家庭时刻',
+          reason: '很好', description: '温馨的家庭时刻', caption: '那一刻的温暖',
         });
 
-      // Step 5: Generate caption
+      // Step 5: generateCaption is fallback only, should not be called when caption exists
       ollamaService.generateCaption.mockResolvedValue({
-        caption: '那一刻的温暖',
+        caption: 'fallback文案',
         style: 'modern',
       });
 
@@ -131,9 +131,11 @@ describe('MemoriesService', () => {
       expect(result).toBeTruthy(); // returns date string
       expect(immichService.getHistoricalPhotos).toHaveBeenCalled();
       expect(immichService.getThumbnail).toHaveBeenCalledTimes(2);
-      expect(ollamaService.quickScreen).toHaveBeenCalledTimes(2);
+      // quickScreen skipped: 2 photos ≤ screenThreshold (20)
+      expect(ollamaService.quickScreen).not.toHaveBeenCalled();
       expect(ollamaService.deepScoreMemoryValue).toHaveBeenCalledTimes(2);
-      expect(ollamaService.generateCaption).toHaveBeenCalledWith('温馨的家庭时刻', 'modern');
+      // generateCaption not called when multimodal model returns caption directly
+      expect(ollamaService.generateCaption).not.toHaveBeenCalled();
       expect(imageProcessorService.createMemorialCardWithDate).toHaveBeenCalled();
       expect(memorialRepository.save).toHaveBeenCalled();
     });
@@ -146,14 +148,15 @@ describe('MemoriesService', () => {
       ollamaService.quickScreen.mockResolvedValue(false); // fails screening
       ollamaService.deepScoreMemoryValue.mockResolvedValue({
         overall: 6, sentiment: 6, composition: 6, historical: 6, nostalgia: 6,
-        reason: '一般', description: '照片描述',
+        reason: '一般', description: '照片描述', caption: '文案',
       });
       ollamaService.generateCaption.mockResolvedValue({ caption: '文案', style: 'modern' });
       imageProcessorService.createMemorialCardWithDate.mockResolvedValue(Buffer.from('img'));
 
       const result = await service.processMemories();
       expect(result).toBeTruthy();
-      // Should still call deepScore even though screening failed
+      // quickScreen skipped (1 photo ≤ threshold), deepScore still called
+      expect(ollamaService.quickScreen).not.toHaveBeenCalled();
       expect(ollamaService.deepScoreMemoryValue).toHaveBeenCalled();
     });
 
@@ -165,15 +168,15 @@ describe('MemoriesService', () => {
       immichService.getThumbnail.mockResolvedValue('/tmp/thumb.jpg');
       ollamaService.quickScreen.mockResolvedValue(true);
       ollamaService.deepScoreMemoryValue
-        .mockResolvedValueOnce({ overall: 3, sentiment: 3, composition: 3, historical: 3, nostalgia: 3, reason: '', description: 'low' })
-        .mockResolvedValueOnce({ overall: 9, sentiment: 9, composition: 9, historical: 9, nostalgia: 9, reason: '', description: 'high desc' });
+        .mockResolvedValueOnce({ overall: 3, sentiment: 3, composition: 3, historical: 3, nostalgia: 3, reason: '', description: 'low', caption: 'low文案' })
+        .mockResolvedValueOnce({ overall: 9, sentiment: 9, composition: 9, historical: 9, nostalgia: 9, reason: '', description: 'high desc', caption: 'high文案' });
       ollamaService.generateCaption.mockResolvedValue({ caption: '文案', style: 'modern' });
       imageProcessorService.createMemorialCardWithDate.mockResolvedValue(Buffer.from('img'));
 
       await service.processMemories();
 
-      // Caption should be generated from the high-scored photo's description
-      expect(ollamaService.generateCaption).toHaveBeenCalledWith('high desc', 'modern');
+      // Caption comes directly from multimodal model, generateCaption not called
+      expect(ollamaService.generateCaption).not.toHaveBeenCalled();
       // Saved score should be the highest
       expect(memorialRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({ score: 9, sourceAssetId: 'high' }),

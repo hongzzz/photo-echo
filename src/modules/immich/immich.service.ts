@@ -26,7 +26,13 @@ export interface Asset {
     iso?: number;
     make?: string;
     model?: string;
+    latitude?: number;
+    longitude?: number;
+    city?: string;
+    state?: string;
+    country?: string;
   };
+  peopleNames?: string[];
 }
 
 @Injectable()
@@ -153,6 +159,10 @@ export class ImmichService implements OnModuleInit {
   }
 
   private mapAsset(asset: AssetResponseDto): Asset {
+    const peopleNames = (asset.people || [])
+      .map(p => p.name)
+      .filter((name): name is string => !!name);
+
     return {
       id: asset.id,
       originalFileName: asset.originalFileName || 'unknown',
@@ -166,7 +176,13 @@ export class ImmichService implements OnModuleInit {
         iso: asset.exifInfo.iso || undefined,
         make: asset.exifInfo.make || undefined,
         model: asset.exifInfo.model || undefined,
+        latitude: asset.exifInfo.latitude ?? undefined,
+        longitude: asset.exifInfo.longitude ?? undefined,
+        city: asset.exifInfo.city || undefined,
+        state: asset.exifInfo.state || undefined,
+        country: asset.exifInfo.country || undefined,
       } : undefined,
+      peopleNames: peopleNames.length > 0 ? peopleNames : undefined,
     };
   }
 }
